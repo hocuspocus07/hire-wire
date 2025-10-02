@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { signOut } from "@/utils/actions"
+import { Avatar,AvatarFallback,AvatarImage} from "./ui/avatar"
 
 const navItems = [
   { href: "#features", label: "Features" },
@@ -42,6 +43,20 @@ export function SiteNavbar() {
     await signOut();
     setUser(null)
     router.push("/")
+  }
+
+  const getInitials = (name: string) =>
+    (name || user?.email || "U")
+      .split(" ")
+      .map((p: string) => p[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+
+  const getImageUrl = () => {
+    const avatarUrl = user?.user_metadata?.avatar_url
+    if (!avatarUrl) return null
+    return avatarUrl
   }
 
   return (
@@ -117,11 +132,10 @@ export function SiteNavbar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2 py-1">
-                  <img 
-                    src={user.user_metadata?.avatar_url || "/default-avatar.png"} 
-                    alt="pfp" 
-                    className="h-8 w-8 rounded-full border"
-                  />
+                  <Avatar className="w-8 h-8 border-2 border-border">
+                <AvatarImage src={getImageUrl() || ""} alt={user.user_metadata?.name || "Avatar"} />
+                <AvatarFallback className="text-lg">{getInitials(user.user_metadata?.name)}</AvatarFallback>
+              </Avatar>
                   <span className="font-medium">{user.user_metadata?.name || user.email}</span>
                 </Button>
               </DropdownMenuTrigger>

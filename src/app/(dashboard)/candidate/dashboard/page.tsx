@@ -1,71 +1,129 @@
 "use client"
 
-import { ProfileHeader }from "@/components/profile-header"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { createBrowserClient } from "@supabase/ssr"
+import { motion } from "framer-motion"
+import { Star, Timer, Award, Edit } from "lucide-react"
+
+import { ProfileHeader } from "@/components/profile-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { Star, Timer, Award } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ProfileEditDialog } from "@/components/profile-edit-dialog"
 
-const user = {
-  name: "Jordan Patel",
-  role: "Candidate",
-  email: "jordan.patel@example.com",
-  imageUrl: "/candidate-avatar.jpg",
-}
+const IntervieweeDashboard = () => {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [editOpen, setEditOpen] = useState(false)
 
-const mockInterviews = [
-  {
-    id: "room-123",
-    domain: "Full-Stack Development",
-    level: "Mid",
-    status: "completed",
-    score: 85,
-    percentile: 92,
-    date: "2024-01-15",
-    duration: "45 mins",
-  },
-  {
-    id: "room-124",
-    domain: "Frontend Development",
-    level: "Senior",
-    status: "scheduled",
-    score: null,
-    percentile: null,
-    date: "2024-01-18",
-    duration: "60 mins",
-  },
-]
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    )
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data?.user ?? null)
+      setLoading(false)
+    })
+  }, [])
 
-export default function IntervieweeDashboard() {
+  const mockInterviews = [
+    {
+      id: "room-123",
+      domain: "Full-Stack Development",
+      level: "Mid",
+      status: "completed",
+      score: 85,
+      percentile: 92,
+      date: "2024-01-15",
+      duration: "45 mins",
+    },
+    {
+      id: "room-124",
+      domain: "Frontend Development",
+      level: "Senior",
+      status: "scheduled",
+      score: null,
+      percentile: null,
+      date: "2024-01-18",
+      duration: "60 mins",
+    },
+  ]
   const completed = mockInterviews.filter((i) => i.status === "completed")
   const upcoming = mockInterviews.filter((i) => i.status === "scheduled")
+  const avg = completed.length ? Math.round(completed.reduce((a, c) => a + (c.score || 0), 0) / completed.length) : null
+  const best = completed.length ? Math.max(...completed.map((i) => i.percentile || 0)) : null
 
-  const avg =
-    completed.length > 0
-      ? Math.round(completed.reduce((acc, curr) => acc + (curr.score || 0), 0) / completed.length)
-      : null
-
-  const best = completed.length > 0 ? Math.max(...completed.map((i) => i.percentile || 0)) : null
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Profile skeleton */}
+        <div className="p-4 md:p-6 border rounded-lg">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-14 w-14 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-md" />
+            ))}
+          </div>
+        </div>
+        {/* Upcoming skeleton */}
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-56" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+        {/* Recent skeleton */}
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <ProfileHeader
-        name={user.name}
-        role={user.role}
-        email={user.email}
-        imageUrl={user.imageUrl}
-        meta={[
-          { label: "Total Interviews", value: String(completed.length) },
-          { label: "Average Score", value: avg ? `${avg}%` : "-" },
-          { label: "Best Percentile", value: best ? `Top ${best}%` : "-" },
-          { label: "Upcoming", value: String(upcoming.length) },
-        ]}
-        actions={
+      {user ? (
+        <ProfileHeader
+          name={user.user_metadata?.name || user.email?.split("@")[0] || "User"}
+          role={user.user_metadata?.role || "Candidate"}
+          email={user.email}
+          imageUrl={user.user_metadata?.avatar_url}
+          meta={[
+            { label: "Total Interviews", value: String(completed.length) },
+            { label: "Average Score", value: avg ? `${avg}%` : "-" },
+            { label: "Best Percentile", value: best ? `Top ${best}%` : "-" },
+            { label: "Upcoming", value: String(upcoming.length) },
+          ]}
+          actions={
+            <>
+              <Button variant="outline" onClick={() => setEditOpen(true)} className="flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Edit Profile
+              </Button>
+              <Button asChild>
+                <Link href="/interviewee/interviews/new">Schedule Interview</Link>
+              </Button>
+            </>
+          }
+        />
+      ) : (
+        <div className="text-center space-y-4">
+          <h2 className="text-xl font-semibold">Welcome</h2>
+          <p className="text-muted-foreground">Please sign in to view your interview dashboard.</p>
           <Button asChild>
-            <Link href="/interviewee/interviews/new">Schedule Interview</Link>
+            <Link href="/auth/login">Log In</Link>
           </Button>
-        }
-      />
+        </div>
+      )}
 
       {/* Upcoming */}
       <Card className="mb-2">
@@ -78,7 +136,13 @@ export default function IntervieweeDashboard() {
           ) : (
             <div className="space-y-3">
               {upcoming.map((i) => (
-                <div key={i.id} className="flex items-center justify-between rounded-lg border p-4">
+                <motion.div
+                  key={i.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
                   <div>
                     <div className="font-medium">{i.domain}</div>
                     <div className="text-sm text-muted-foreground">
@@ -88,7 +152,7 @@ export default function IntervieweeDashboard() {
                   <Button asChild>
                     <Link href={`/interviewee/interviews/${i.id}`}>Join</Link>
                   </Button>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
@@ -106,9 +170,15 @@ export default function IntervieweeDashboard() {
           ) : (
             <div className="space-y-3">
               {completed.map((i) => (
-                <div key={i.id} className="flex items-center justify-between rounded-lg border p-4">
+                <motion.div
+                  key={i.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <div className="font-medium">{i.domain}</div>
                       <span className="rounded-md bg-secondary px-2 py-0.5 text-xs">{i.level}</span>
                       <span className="rounded-md px-2 py-0.5 text-xs border">Completed</span>
@@ -134,12 +204,22 @@ export default function IntervieweeDashboard() {
                   <Button variant="outline" asChild>
                     <Link href={`/interviewee/interviews/${i.id}/report`}>View Report</Link>
                   </Button>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <ProfileEditDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        user={user}
+        onProfileUpdate={setUser}
+        type="candidate"
+      />
     </div>
   )
 }
+
+export default IntervieweeDashboard
