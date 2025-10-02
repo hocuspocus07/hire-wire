@@ -45,7 +45,6 @@ export default function InterviewRoom() {
       })
     }, 1000)
     return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInterviewStarted, isCompleted, currentQuestionIndex])
 
   const handleStartInterview = () => setIsInterviewStarted(true)

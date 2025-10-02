@@ -1,12 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { motion } from "framer-motion"
-import { Menu, Bot, User, LogIn } from "lucide-react"
+import { Menu, Bot, LogIn, User } from "lucide-react"
 import { ModeToggle } from "./mode-toggle"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { signOut } from "@/utils/actions"
 
 const navItems = [
   { href: "#features", label: "Features" },
@@ -16,6 +25,24 @@ const navItems = [
 
 export function SiteNavbar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null);
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+    )
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data?.user ?? null)
+    })
+  }, [])
+
+  async function handleSignOut() {
+    await signOut();
+    setUser(null)
+    router.push("/")
+  }
 
   return (
     <motion.header
@@ -77,7 +104,7 @@ export function SiteNavbar() {
           ))}
         </motion.div>
 
-        {/* Right: Actions */}
+        {/* Right: Actions (Desktop) */}
         <motion.div 
           initial={{ opacity: 0, x: 8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -85,27 +112,52 @@ export function SiteNavbar() {
           className="hidden md:flex items-center gap-2"
         >
           <ModeToggle />
-          
-          <Button 
-            variant="ghost" 
-            className="text-sm font-medium gap-2 transition-all duration-200 hover:bg-accent/50"
-            asChild
-          >
-            <Link href="/login">
-              <LogIn className="h-4 w-4" />
-              Sign in
-            </Link>
-          </Button>
-          
-          <Button 
-            className="text-sm font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-200 shadow-lg hover:shadow-primary/25"
-            asChild
-          >
-            <Link href="/register" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Sign up
-            </Link>
-          </Button>
+
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 px-2 py-1">
+                  <img 
+                    src={user.user_metadata?.avatar_url || "/default-avatar.png"} 
+                    alt="pfp" 
+                    className="h-8 w-8 rounded-full border"
+                  />
+                  <span className="font-medium">{user.user_metadata?.name || user.email}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem asChild>
+                  <Link href={`/${user.user_metadata.role}/dashboard`}>Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <Button 
+                variant="ghost" 
+                className="text-sm font-medium gap-2 transition-all duration-200 hover:bg-accent/50"
+                asChild
+              >
+                <Link href="/login">
+                  <LogIn className="h-4 w-4" />
+                  Sign in
+                </Link>
+              </Button>
+              
+              <Button 
+                className="text-sm font-medium bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-200 shadow-lg hover:shadow-primary/25"
+                asChild
+              >
+                <Link href="/register" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Sign up
+                </Link>
+              </Button>
+            </>
+          )}
         </motion.div>
 
         {/* Mobile menu */}
@@ -134,7 +186,7 @@ export function SiteNavbar() {
                 animate={{ opacity: 1, x: 0 }}
                 className="mt-8 flex flex-col h-full"
               >
-                {/* Brand in mobile menu */}
+                {/* Brand */}
                 <div className="mb-8 px-2">
                   <Link
                     href="/"
@@ -172,28 +224,41 @@ export function SiteNavbar() {
                   ))}
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons / User info */}
                 <div className="mt-auto pt-8 pb-4 flex flex-col gap-3 border-t border-border/40">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-center gap-2 font-medium py-3"
-                    asChild
-                  >
-                    <Link href="#signin">
-                      <LogIn className="h-4 w-4" />
-                      Sign in
-                    </Link>
-                  </Button>
-                  
-                  <Button 
-                    className="w-full justify-center gap-2 font-medium py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                    asChild
-                  >
-                    <Link href="#create-room">
-                      <User className="h-4 w-4" />
-                      Create room
-                    </Link>
-                  </Button>
+                  {user ? (
+                    <>
+                      <Button variant="ghost" className="justify-start" asChild>
+<Link href={`/${user.user_metadata.role}/dashboard`}>Dashboard</Link>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        className="justify-start text-red-500" 
+                        onClick={handleSignOut}
+                      >
+                        Sign out
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" className="w-full justify-center gap-2 font-medium py-3" asChild>
+                        <Link href="/login">
+                          <LogIn className="h-4 w-4" />
+                          Sign in
+                        </Link>
+                      </Button>
+                      
+                      <Button 
+                        className="w-full justify-center gap-2 font-medium py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                        asChild
+                      >
+                        <Link href="/register">
+                          <User className="h-4 w-4" />
+                          Sign up
+                        </Link>
+                      </Button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </SheetContent>

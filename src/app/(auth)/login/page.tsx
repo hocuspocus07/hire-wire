@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, LogIn, Mail, Lock, ArrowRight, Bot } from "lucide-react"
+import { signIn } from "@/utils/actions"
+import {toast} from 'sonner'
+import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -16,15 +19,42 @@ export default function LoginPage() {
     email: "",
     password: "",
   })
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    console.log("Login attempt:", formData)
+  e.preventDefault()
+  setIsLoading(true)
+
+  const fd = new FormData()
+  fd.append("email", formData.email)
+  fd.append("password", formData.password)
+
+  const result = await signIn(fd)
+
+  setIsLoading(false)
+
+  if (result?.error) {
+    if (result.code === "email_not_confirmed") {
+      toast.error("Please verify your email before logging in.")
+    } else if (result.code === "invalid_credentials") {
+      toast.error("Invalid credentials")
+    } else if (result.code === "user_not_found") {
+      toast.error("Account not found. Please sign up first.")
+    } else {
+      toast.error(result.error)
+    }
+    return
   }
+
+  toast.success("Logged in successfully!")
+
+  if (result.role === "interviewer") {
+    router.push("/interviewer/dashboard")
+  } else if (result.role === "candidate") {
+    router.push("/candidate/dashboard")
+  }
+}
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({

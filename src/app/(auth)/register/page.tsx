@@ -8,19 +8,23 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, UserPlus, Mail, Lock, User, ArrowRight, Bot, Briefcase } from "lucide-react"
+import { signUp } from "@/utils/actions"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+    name:"",
     email: "",
     password: "",
     confirmPassword: "",
-    role: "candidate", // "candidate" or "interviewer"
+    role: "candidate",
   })
+
+  const router=useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,10 +33,22 @@ export default function RegisterPage() {
       return
     }
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    console.log("Registration attempt:", formData)
+    const fd = new FormData();
+  fd.append("name", formData.name);
+  fd.append("email", formData.email);
+  fd.append("password", formData.password);
+  fd.append("role", formData.role);
+    const result=await signUp(fd);
+
+    if (result?.success) {
+      router.push("/login")
+      toast.success("User registered successfully. Check your email for verification.")
+    } else if (result?.error === "duplicate") {
+      toast.error("An account with this email already exists. Please log in or use a different email.")
+    } else {
+      toast.error("Something went wrong")
+      console.log(result?.error)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -85,40 +101,23 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium">
-                    First name
+                  <Label htmlFor="name" className="text-sm font-medium">
+                    Name
                   </Label>
                   <div className="relative">
                     <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="firstName"
-                      name="firstName"
+                      id="name"
+                      name="name"
                       type="text"
-                      placeholder="John"
+                      placeholder="John Doe"
                       className="pl-10 h-11"
-                      value={formData.firstName}
+                      value={formData.name}
                       onChange={handleChange}
                       required
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium">
-                    Last name
-                  </Label>
-                  <Input
-                    id="lastName"
-                    name="lastName"
-                    type="text"
-                    placeholder="Doe"
-                    className="h-11"
-                    value={formData.lastName}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
 
               {/* Role Selection */}
               <div className="space-y-2">
