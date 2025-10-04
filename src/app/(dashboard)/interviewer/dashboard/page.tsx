@@ -12,30 +12,159 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProfileEditDialog } from "@/components/profile-edit-dialog"
 
+interface Interview {
+  id: string;
+  candidate_name: string;
+  role: string;
+  status: "live" | "completed" | "pending";
+  score: number | null;
+  created_at: string;
+}
+interface InterviewSummary {
+  final_score: number | null;
+}
+
+interface RecentSummary {
+  id: string;
+  participant_name: string;
+  final_score: number | null;
+  created_at: string;
+}
+
 export default function InterviewerDashboard() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
+  const [stats, setStats] = useState<{ label: string; value: string; icon: any }[]>([]);
 
   useEffect(() => {
-  const supabase = getSupabaseBrowser()
-  supabase.auth.getUser().then(({ data }: UserResponse) => {
-    setUser(data?.user ?? null)
-    setLoading(false)
-  })
-}, [])
+    if (!user) return;
+
+    const supabase = getSupabaseBrowser();
+
+    const fetchStats = async () => {
+      const supabase = getSupabaseBrowser();
+      const interviewerId = user.id;
+
+      // all rooms by signed in user
+      const { data: rooms, error: roomsError } = await supabase
+        .from("rooms")
+        .select("code")
+        .eq("created_by", interviewerId);
+
+      if (roomsError) {
+        console.error("Error fetching rooms:", roomsError);
+        return;
+      }
+
+      const roomCodes = rooms?.map((r: any) => r.code) || [];
+      if (roomCodes.length === 0) {
+        setStats([
+          { label: "Total Participants", value: "0", icon: Users },
+          { label: "Interviews Today", value: "0", icon: CalendarDays },
+          { label: "Avg Score", value: "0%", icon: BarChart3 },
+        ]);
+        return;
+      }
+
+      // all summaries from those rooms
+      const { data: summaries, error: summariesError } = await supabase
+        .from("interview_summaries")
+        .select("final_score, created_at")
+        .in("room_code", roomCodes)
+        .not("final_score", "is", null);
+
+      if (summariesError) {
+        console.error("Error fetching interview summaries:", summariesError);
+        return;
+      }
+
+      // compute stats
+      const totalParticipants = summaries?.length || 0;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const interviewsToday = summaries?.filter((s: any) => new Date(s.created_at) >= today).length || 0;
+
+      const scores = summaries?.map((s: any) => s.final_score ?? 0) || [];
+      const avgScore = scores.length > 0
+        ? Math.round(scores.reduce((acc: number, curr: number) => acc + curr, 0) / scores.length)
+        : 0;
+
+      // update
+      setStats([
+        { label: "Total Participants", value: totalParticipants.toString(), icon: Users },
+        { label: "Interviews Today", value: interviewsToday.toString(), icon: CalendarDays },
+        { label: "Avg Score", value: `${avgScore}%`, icon: BarChart3 },
+      ]);
+    };
+
+
+    fetchStats();
+  }, [user]);
+
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchRecentActivity = async () => {
+      if (!user) return;
+
+      const supabase = getSupabaseBrowser();
+      const { data: rooms, error: roomsError } = await supabase
+        .from("rooms")
+        .select("code")
+        .eq("created_by", user.id);
+
+      if (roomsError) {
+        console.error("Error fetching rooms:", roomsError);
+        return;
+      }
+
+      const roomCodes = rooms?.map((r: any) => r.code) || [];
+      if (roomCodes.length === 0) return; 
+
+      const { data, error } = await supabase
+        .from("interview_summaries")
+        .select("id, participant_name, final_score, created_at")
+        .in("room_code", roomCodes)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error("Error fetching recent summaries:", error);
+        return;
+      }
+
+      const formatted = (data as RecentSummary[]).map(s => ({
+        id: s.id,
+        candidateName: s.participant_name,
+        score: s.final_score,
+        time: new Date(s.created_at).toLocaleString(),
+      }));
+
+      setRecentActivity(formatted);
+    };
+
+
+    fetchRecentActivity();
+  }, [user]);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowser()
+    supabase.auth.getUser().then(({ data }: UserResponse) => {
+      setUser(data?.user ?? null)
+      setLoading(false)
+    })
+  }, [])
 
   const interviewer = {
     name: user?.user_metadata?.name || user?.email?.split("@")[0] || "Interviewer",
     role: "Interviewer • Engineering",
     email: user?.email,
     imageUrl: user?.user_metadata?.avatar_url,
-    meta: [
-      { label: "Interviews Today", value: "3" },
-      { label: "Total Candidates", value: "47" },
-      { label: "Pending Reviews", value: "2" },
-      { label: "Avg Score", value: "72%" },
-    ],
+    meta: stats
   }
 
   if (loading) {
@@ -49,7 +178,7 @@ export default function InterviewerDashboard() {
               <Skeleton className="h-4 w-56" />
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-14 w-full rounded-md" />
             ))}
@@ -73,18 +202,6 @@ export default function InterviewerDashboard() {
       </div>
     )
   }
-
-  const stats = [
-    { label: "Total Candidates", value: "47", icon: Users },
-    { label: "Interviews Today", value: "3", icon: CalendarDays },
-    { label: "Avg Score", value: "72%", icon: BarChart3 },
-    { label: "Pending Reviews", value: "2", icon: ListChecks },
-  ]
-
-  const recentActivity = [
-    { id: "1", candidateName: "John Doe", role: "Frontend", status: "completed", score: 88, time: "2h ago" },
-    { id: "2", candidateName: "Jane Smith", role: "Full-Stack", status: "live", score: null, time: "Now" },
-  ]
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -110,7 +227,7 @@ export default function InterviewerDashboard() {
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map(({ label, value, icon: Icon }) => (
           <Card key={label}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
