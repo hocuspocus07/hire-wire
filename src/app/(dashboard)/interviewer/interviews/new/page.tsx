@@ -38,7 +38,7 @@ useEffect(() => {
   if (!title.trim()) return alert("Please enter a title first.")
   setGenerating(true)
   try {
-    const res = await fetch("/api/generate-questions", {
+    const res = await fetch("/api/ai/generate-questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topic: title, description }),
@@ -47,8 +47,8 @@ useEffect(() => {
 
     if (res.ok && data.text?.length > 0) {
       const parsedQuestions = data.text
-        .split(/\n\d+\.\s+/) // split by newlines followed by number + dot
-        .map((q:string, i:number) => (i === 0 ? q.replace(/^1\.\s*/, "") : q)) // clean first question
+        .split(/\n\d+\.\s+/) 
+        .map((q:string, i:number) => (i === 0 ? q.replace(/^1\.\s*/, "") : q)) 
         .map((q:string) => q.trim())
         .filter((q:string) => q.length > 0)
 
@@ -126,7 +126,6 @@ useEffect(() => {
             />
           </div>
 
-          {/* Generate Questions Button */}
           {!showQuestions && title.trim() && (
             <Button
               variant="outline"
@@ -139,14 +138,12 @@ useEffect(() => {
         </CardContent>
       </Card>
 
-      {/* Questions Section */}
       {showQuestions && (
         <Card>
           <CardHeader>
             <CardTitle>Questions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Add Question Input */}
             <div className="flex gap-2 items-center">
               <Input
                 placeholder="Enter a question"
@@ -159,7 +156,6 @@ useEffect(() => {
 
             <Separator />
 
-            {/* Display Questions */}
             <div className="space-y-2">
               {questions.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
