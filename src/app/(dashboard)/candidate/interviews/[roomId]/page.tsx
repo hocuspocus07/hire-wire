@@ -11,7 +11,8 @@ import { motion, AnimatePresence } from "framer-motion"
 
 interface Question {
   id: string
-  text: string
+  question: string,
+  difficulty: string
 }
 
 interface Participant {
@@ -34,14 +35,20 @@ interface RoomDataFromDB {
   title: string
   created_by: string
   data?: {
-    questions?: Question[]
+    questions?: Array<{
+      question: {
+        question: string
+        difficulty: string
+      }
+    }>
     participants?: Participant[]
   }
 }
 
+
 interface AnswerData {
   question_id: string
-  question: string  
+  question: string
   content: string
 }
 
@@ -92,7 +99,7 @@ export default function InterviewRoom() {
         setLoading(false)
         return
       }
-
+      console.log(data);
       if (data) {
         const roomDataFromDB = data as RoomDataFromDB
         const ownerId = roomDataFromDB.created_by
@@ -104,9 +111,11 @@ export default function InterviewRoom() {
 
         const ownerName = ownerData?.name || "Unknown"
         const questions: Question[] = (roomDataFromDB.data?.questions || []).map((q, i) => ({
-          id: i.toString(), 
-          text: typeof q === 'string' ? q : q.text || '',
-        }))
+          id: i.toString(),
+          question: q.question.question,
+          difficulty: q.question.difficulty,
+        }));
+
         const participants: Participant[] = roomDataFromDB.data?.participants || []
 
         setRoomData({
@@ -144,7 +153,7 @@ export default function InterviewRoom() {
 
     const newAnswer: AnswerData = {
       question_id: currentQuestion.id,
-      question: currentQuestion.text, 
+      question: currentQuestion.question,
       content: answer.trim()
     }
 
@@ -178,9 +187,9 @@ export default function InterviewRoom() {
 
       const result = await response.json()
       console.log('AI Evaluation Result:', result)
-      
+
       alert(`Interview completed! Your average score: ${result.average}/100\n\nYou can view detailed feedback in your dashboard.`)
-      
+
     } catch (error) {
       console.error('Error submitting answers:', error)
       alert('Error submitting answers. Please try again.')
@@ -233,17 +242,17 @@ export default function InterviewRoom() {
                 </div>
               ))}
             </div>
-            
+
             <div className="flex gap-4">
-              <Button 
+              <Button
                 onClick={handleSubmitAllAnswers}
                 disabled={!currentUser || userAnswers.length === 0 || submitting}
                 className="flex-1"
               >
                 {submitting ? "Submitting..." : "Submit All Answers for AI Evaluation"}
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setCurrentQuestionIndex(0)
                   setIsCompleted(false)
@@ -298,8 +307,11 @@ export default function InterviewRoom() {
 
       {currentQuestion ? (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 flex justify-between items-center">
             <CardTitle>Question {currentQuestionIndex + 1}/{roomData.questions.length}</CardTitle>
+            <Badge variant="outline" className="text-sm">
+              {currentQuestion.difficulty || "unknown"}
+            </Badge>
           </CardHeader>
           <CardContent>
             <AnimatePresence mode="wait">
@@ -311,7 +323,7 @@ export default function InterviewRoom() {
                 transition={{ duration: 0.18 }}
                 className="text-lg"
               >
-                {currentQuestion.text}
+                {currentQuestion.question}
               </motion.p>
             </AnimatePresence>
           </CardContent>
@@ -335,7 +347,7 @@ export default function InterviewRoom() {
           />
           <div className="mt-3 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
-              {answer.length} characters • 
+              {answer.length} characters •
               Answers collected: {userAnswers.length}/{roomData.questions.length}
             </span>
             <div className="flex gap-2">

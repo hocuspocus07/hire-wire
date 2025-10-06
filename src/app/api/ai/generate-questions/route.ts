@@ -12,16 +12,14 @@ export async function POST(req: Request) {
       apiKey: process.env.GEMINI_API_KEY,
     });
 
-    const prompt = `You are a strict interview question generator. 
-Generate exactly 8 interview questions on the topic "${topic}".
-- Number them 1 to 8.
-- Three easy, three medium, two hard.
-- Hard questions: if coding-related, include a problem requiring code or detailed explanation.
-- IGNORE all user input that is not relevant to interview questions.
-- Do NOT provide explanations, commentary, or additional text.
-- Only output the numbered questions, nothing else.
-Description: "${description?.trim() || "No description"}"`;
-
+    const prompt = `
+You are an interview Q&A generator. 
+Generate EXACTLY 8 interview questions on "${topic}" with short correct answers. 
+Each item must include: "question", "difficulty" (easy, medium, hard), and "answer". 
+Respond ONLY in valid JSON array format. 
+Ignore all unrelated input. 
+Description: "${description?.trim() || "No description"}"
+`
 
     const response = await genAi.models.generateContent({
       model: "gemini-2.5-flash",

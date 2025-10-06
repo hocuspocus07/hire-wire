@@ -20,9 +20,9 @@ export default function CreateInterviewPage() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const router = useRouter()
-const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<any>(null)
 
-useEffect(() => {
+  useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
@@ -35,35 +35,41 @@ useEffect(() => {
 
 
   const handleGenerateQuestions = async () => {
-  if (!title.trim()) return alert("Please enter a title first.")
-  setGenerating(true)
-  try {
-    const res = await fetch("/api/ai/generate-questions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: title, description }),
-    })
-    const data = await res.json()
+    if (!title.trim()) return alert("Please enter a title first.")
+    setGenerating(true)
+    try {
+      const res = await fetch("/api/ai/generate-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: title, description }),
+      })
+      const data = await res.json()
 
-    if (res.ok && data.text?.length > 0) {
-      const parsedQuestions = data.text
-        .split(/\n\d+\.\s+/) 
-        .map((q:string, i:number) => (i === 0 ? q.replace(/^1\.\s*/, "") : q)) 
-        .map((q:string) => q.trim())
-        .filter((q:string) => q.length > 0)
+      if (res.ok && data.text?.length > 0) {
+        try {
+          const cleaned = data.text
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim()
 
-      setQuestions(parsedQuestions)
-      setShowQuestions(true)
-    } else {
-      alert("No questions generated.")
+          const parsed = JSON.parse(cleaned).map((q: any) => ({ ...q, showAnswer: false }))
+          setQuestions(parsed)
+          setShowQuestions(true)
+        } catch (parseErr) {
+          console.error("JSON parsing failed:", parseErr)
+          alert("Failed to parse AI output. Please try again.")
+        }
+      } else {
+        alert("No questions generated.")
+      }
+
+    } catch (err) {
+      console.error(err)
+      alert("Failed to generate questions.")
+    } finally {
+      setGenerating(false)
     }
-  } catch (err) {
-    console.error(err)
-    alert("Failed to generate questions.")
-  } finally {
-    setGenerating(false)
   }
-}
 
   const handleAddQuestion = () => {
     if (!newQuestion.trim()) return
@@ -162,21 +168,36 @@ useEffect(() => {
                   No questions generated yet.
                 </p>
               ) : (
-                questions.map((q, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
-                  >
-                    <span>{q}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setQuestions(questions.filter((_, idx) => idx !== i))
-                      }
-                    >
-                      Remove
-                    </Button>
+                questions.map((q: any, i) => (
+                  <div key={i} className="border rounded-md px-3 py-2 text-sm space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{q.question}</span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setQuestions(prev =>
+                              prev.map((item: any, idx: number) =>
+                                idx === i ? { ...item, showAnswer: !item.showAnswer } : item
+                              )
+                            )
+                          }
+                        >
+                          {q.showAnswer ? "Hide Answer" : "Show Answer"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setQuestions(prev => prev.filter((_, idx) => idx !== i))
+                          }
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                    {q.showAnswer && <p className="text-xs text-muted-foreground">{q.answer}</p>}
                   </div>
                 ))
               )}
