@@ -5,7 +5,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Download, Star, Brain, MessageSquare } from "lucide-react"
+import { Download, Brain, MessageSquare } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
@@ -23,16 +23,16 @@ interface Answer {
   content: string | null
   ai_score: number | null
   ai_feedback: string | null
+  question_index: number | null
 }
 
 interface RoomQuestion {
   id: string
-  question_text: string
+  question: string
   correct_answer?: string | null
 }
 
 interface InterviewSummary {
-  summary: string | null
   final_score: number | null
   created_at: string
 }
@@ -54,21 +54,42 @@ export function ReportModal({ open, onOpenChange, roomCode, candidateId }: Props
     const fetchReport = async () => {
       setLoading(true)
 
-      const [{ data: ansData }, { data: qData }, { data: summaryData }] = await Promise.all([
+      const [answersRes, roomRes, summaryRes] = await Promise.all([
         supabase.from("answers").select("*").eq("candidate_id", candidateId),
-        supabase.from("rooms").select("id, question_text, correct_answer").eq("code", roomCode),
-        supabase.from("interview_summaries").select("summary, final_score, created_at").eq("room_code", roomCode).single(),
+        supabase.from("rooms").select("data").eq("code", roomCode).single(),
+        supabase
+          .from("interview_summaries")
+          .select("final_score, created_at")
+          .eq("room_code", roomCode)
+          .eq("candidate_id", candidateId)
+          .single(),
       ])
 
-      if (ansData) setAnswers(ansData)
-      if (qData) setQuestions(qData)
+      const { data: ansData } = answersRes
+      const { data: roomData } = roomRes
+      const { data: summaryData } = summaryRes
+
+      if (ansData) {
+        const sorted = ansData.sort((a, b) => (a.question_index ?? 0) - (b.question_index ?? 0))
+        setAnswers(sorted)
+      }
+
+      if (roomData && roomData.data && Array.isArray(roomData.data.questions)) {
+        const formattedQuestions: RoomQuestion[] = roomData.data.questions.map((q: any, index: number) => ({
+          id: index.toString(), 
+          question: q.question.question,
+          correct_answer: q.question.answer,
+        }))
+        setQuestions(formattedQuestions)
+      }
+
       if (summaryData) setSummary(summaryData)
 
       setLoading(false)
     }
 
     fetchReport()
-  }, [open])
+  }, [open, roomCode, candidateId, supabase])
 
   const handleDownload = () => {
     const doc = new jsPDF()
@@ -78,24 +99,22 @@ export function ReportModal({ open, onOpenChange, roomCode, candidateId }: Props
     if (summary) {
       doc.text(`Final Score: ${summary.final_score ?? "-"}%`, 14, 30)
       doc.text(`Date: ${new Date(summary.created_at).toLocaleDateString()}`, 14, 37)
-      doc.text("AI Summary:", 14, 47)
-      doc.text(doc.splitTextToSize(summary.summary ?? "No summary available", 180), 14, 55)
     }
 
-    const tableRows = answers.map((a, index) => {
-      const q = questions.find((q) => q.id === a.question_id)
+    const tableRows = answers.map((a) => {
+      const q = questions.find((q) => parseInt(q.id) === a.question_index)
       return [
-        index + 1,
-        q?.question_text ?? "Unknown question",
+        (a.question_index ?? 0) + 1,
+        q?.question ?? "Unknown question",
         a.content ?? "—",
         q?.correct_answer ?? "—",
-        a.ai_score ?? "—",
+        a.ai_score?.toString() ?? "—",
         a.ai_feedback ?? "—",
       ]
     })
 
     autoTable(doc, {
-      head: [["#", "Question", "Your Answer", "AI Correct Answer", "Score", "AI Feedback"]],
+      head: [["#", "Question", "Your Answer", "Correct Answer", "Score", "AI Feedback"]],
       body: tableRows,
       startY: 90,
       styles: { cellWidth: "wrap", fontSize: 9 },
@@ -125,42 +144,35 @@ export function ReportModal({ open, onOpenChange, roomCode, candidateId }: Props
             {summary && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-primary" /> AI Summary
-                  </CardTitle>
+                    <strong>Final Score:</strong>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {summary.summary ?? "No summary available"}
-                  </p>
-                  <div className="mt-4 text-sm">
-                    <strong>Final Score:</strong> {summary.final_score ?? "-"}%
-                  </div>
+                  {summary.final_score ?? "-"}%
                 </CardContent>
               </Card>
             )}
 
             <div className="space-y-4">
               {answers.map((a, idx) => {
-                const q = questions.find((q) => q.id === a.question_id)
+                const q = questions.find((q) => parseInt(q.id) === a.question_index)
                 return (
                   <Card key={a.id}>
                     <CardHeader>
                       <CardTitle className="text-base flex gap-2 items-center">
                         <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                        Question {idx + 1}
+                        Question {(a.question_index ?? 0) + 1}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <p>
-                        <strong>Question:</strong> {q?.question_text ?? "Unknown question"}
+                        <strong>Question:</strong> {q?.question ?? "Unknown question"}
                       </p>
                       <p>
                         <strong>Your Answer:</strong>{" "}
                         <span className="text-muted-foreground">{a.content ?? "—"}</span>
                       </p>
                       <p>
-                        <strong>Correct Answer (AI):</strong>{" "}
+                        <strong>Correct Answer:</strong>{" "}
                         <span className="text-green-600">{q?.correct_answer ?? "—"}</span>
                       </p>
                       <p>

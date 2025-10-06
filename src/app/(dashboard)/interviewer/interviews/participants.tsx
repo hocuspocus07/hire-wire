@@ -11,7 +11,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { BarChart3, User, MessageSquare, Clock, Award } from "lucide-react"
 
 interface Participant {
-    id: string           // UUID (from users.id)
+    id: string
     name: string
     score: number | null
     role?: string
@@ -25,6 +25,7 @@ interface Answer {
     ai_feedback: string | null
     submitted_at: string
     question_text?: string
+    question_index: number | null
 }
 
 interface InterviewSummary {
@@ -72,7 +73,7 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                         id: p.user_id,
                         name: p.users?.name || "Unknown",
                         role: p.users?.role,
-                        score: null 
+                        score: null
                     }))
                     setParticipants(mappedParticipants)
                 }
@@ -110,16 +111,17 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                 .single()
 
             let answersWithQuestions: Answer[] = answers || []
-            console.log(roomData);
 
-            if (!roomError && roomData?.data?.questions) {
-                answersWithQuestions = answers.map((answer, idx) => {
-                    const questionText = roomData.data.questions[idx] || "Unknown Question"
+            if (!roomError && roomData?.data?.questions && Array.isArray(roomData.data.questions)) {
+                answersWithQuestions = answers.map((answer) => {
+                    const questionData = answer.question_index !== null ? roomData.data.questions[answer.question_index] : null
+                    const questionText = questionData?.question?.question || "Unknown Question"
                     return { ...answer, question_text: questionText }
                 })
             }
-
-            setParticipantAnswers(answersWithQuestions)
+            
+            const sortedAnswers = answersWithQuestions.sort((a, b) => (a.question_index ?? 0) - (b.question_index ?? 0));
+            setParticipantAnswers(sortedAnswers)
 
             // Fetch interview summary
             const { data: summary, error: summaryError } = await supabase
