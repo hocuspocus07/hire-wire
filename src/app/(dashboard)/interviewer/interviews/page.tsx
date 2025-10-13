@@ -20,6 +20,7 @@ import { getSupabaseBrowser } from "@/utils/supabase/browser-client"
 import { ParticipantMetricsModal } from "./participants"
 import { toast } from "sonner"
 import Link from "next/link"
+import { ConfirmDeleteModal } from "@/components/confirm-delete-modal"
 interface Participant {
   id: string
   name: string
@@ -60,7 +61,8 @@ export default function InterviewsPage() {
   >(null)
   const [selectedRoomCode, setSelectedRoomCode] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteTargetCode, setDeleteTargetCode] = useState<string | null>(null)
   const supabase = getSupabaseBrowser()
 
   useEffect(() => {
@@ -79,11 +81,11 @@ export default function InterviewsPage() {
         if (roomsError) throw roomsError
 
         if (rooms.length === 0) {
-            setInterviews([]);
-            return;
+          setInterviews([]);
+          return;
         }
 
-        const roomCodes = rooms.map((r:any) => r.code)
+        const roomCodes = rooms.map((r: any) => r.code)
         const { data: summaries, error: summariesError } = await supabase
           .from("interview_summaries")
           .select("room_code, participant_name, final_score")
@@ -91,12 +93,12 @@ export default function InterviewsPage() {
 
         if (summariesError) throw summariesError
 
-        const interviewsData: Interview[] = rooms.map((room:any) => ({
+        const interviewsData: Interview[] = rooms.map((room: any) => ({
           code: room.code,
           title: room.title,
           participants: summaries
-            .filter((s:any) => s.room_code === room.code)
-            .map((s:any) => ({
+            .filter((s: any) => s.room_code === room.code)
+            .map((s: any) => ({
               id: s.participant_name,
               name: s.participant_name,
               score: s.final_score,
@@ -115,17 +117,22 @@ export default function InterviewsPage() {
     fetchInterviews()
   }, [])
 
-  const handleDelete = async (code: string) => {
-    if (!confirm("Are you sure you want to delete this interview permanently? This action cannot be undone.")) return
-    
+  const handleDeleteClick = (code: string) => {
+    setDeleteTargetCode(code)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!deleteTargetCode) return
     try {
-      const { error } = await supabase.from("rooms").delete().eq("code", code)
+      const { error } = await supabase.from("rooms").delete().eq("code", deleteTargetCode)
       if (error) throw error
-      setInterviews(interviews.filter((i) => i.code !== code))
-      toast.success("Interview deleted successfully.")
+      setInterviews(interviews.filter((i) => i.code !== deleteTargetCode))
     } catch (err) {
       console.error(err)
       toast.error("Failed to delete interview.")
+    } finally {
+      setDeleteTargetCode(null)
     }
   }
 
@@ -261,7 +268,7 @@ export default function InterviewsPage() {
                           size="icon"
                           variant="outline"
                           className="text-destructive border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => handleDelete(interview.code)}
+                          onClick={() => handleDeleteClick(interview.code)}
                         >
                           <Trash className="w-4 h-4" />
                         </Button>
@@ -284,7 +291,15 @@ export default function InterviewsPage() {
             roomCode={selectedRoomCode}
           />
         )}
+        {deleteTargetCode && (
+          <ConfirmDeleteModal
+            open={deleteModalOpen}
+            setOpen={setDeleteModalOpen}
+            confirmText={deleteTargetCode}
+            onConfirm={handleDeleteConfirmed}
+          />
+        )}
       </div>
-    </TooltipProvider>
+    </TooltipProvider >
   )
 }
