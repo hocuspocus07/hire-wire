@@ -31,19 +31,21 @@ interface InterviewRoomData {
 }
 
 interface RoomDataFromDB {
-  id: string
-  title: string
-  created_by: string
+  id: string;
+  title: string;
+  created_by: string;
   data?: {
+    description?: string;
     questions?: Array<{
-      question: {
-        question: string
-        difficulty: string
-      }
-    }>
-    participants?: Participant[]
-  }
+      question: string;
+      answer?: string;
+      difficulty: string;
+      showAnswer?: boolean;
+    }>;
+    participants?: Participant[];
+  };
 }
+
 
 
 interface AnswerData {
@@ -112,8 +114,8 @@ export default function InterviewRoom() {
         const ownerName = ownerData?.name || "Unknown"
         const questions: Question[] = (roomDataFromDB.data?.questions || []).map((q, i) => ({
           id: i.toString(),
-          question: q.question.question,
-          difficulty: q.question.difficulty,
+          question: q.question,
+          difficulty: q.difficulty,
         }));
 
         const participants: Participant[] = roomDataFromDB.data?.participants || []
