@@ -37,21 +37,41 @@ const IntervieweeDashboard = () => {
     )
 
     const fetchData = async () => {
+      setLoading(true)
+
       const { data: userData } = await supabase.auth.getUser()
       const loggedUser = userData?.user
       setUser(loggedUser)
 
-      if (loggedUser) {
-        const { data, error } = await supabase
-          .from("interview_summaries")
-          .select("*")
-          .eq("candidate_id", loggedUser.id)
-          .order("created_at", { ascending: false })
-
-        if (!error && data) {
-          setSummaries(data)
-        }
+      if (!loggedUser) {
+        setLoading(false)
+        return
       }
+
+      const { data, error } = await supabase
+        .from("interview_attempts")
+        .select("id, candidate_id, room_code, overall_score, overall_feedback, created_at")
+        .eq("candidate_id", loggedUser.id)
+        .order("created_at", { ascending: false })
+        console.log(data);
+
+      if (error) {
+        console.error("Error fetching interview attempts:", error)
+        setLoading(false)
+        return
+      }
+
+      const mappedSummaries: InterviewSummary[] = (data || []).map((d: any) => ({
+        id: d.id,
+        candidate_id: d.candidate_id,
+        participant_name: loggedUser.user_metadata?.name ?? "Interview",
+        room_code: d.room_code,
+        final_score: d.overall_score,
+        created_at: d.created_at,
+        summary: d.overall_feedback,
+      }))
+
+      setSummaries(mappedSummaries)
       setLoading(false)
     }
 
@@ -59,11 +79,11 @@ const IntervieweeDashboard = () => {
   }, [])
 
   const completed = summaries.filter((i) => i.final_score !== null)
+  console.log(completed);
   const avg =
     completed.length > 0
       ? Math.round(
-        completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) /
-        completed.length
+        completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) / completed.length
       )
       : null
   const best =
@@ -75,14 +95,12 @@ const IntervieweeDashboard = () => {
   const calcPercentile = (score: number) => {
     if (scores.length === 0) return 0
     const lowerScores = scores.filter((s) => s < score).length
-    const percentile = Math.round((lowerScores / scores.length) * 100)
-    return percentile
+    return Math.round((lowerScores / scores.length) * 100)
   }
 
   if (loading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
-        {/* Skeleton loader */}
         <Skeleton className="h-24 w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
@@ -128,7 +146,6 @@ const IntervieweeDashboard = () => {
         }
       />
 
-      {/* Completed Interviews */}
       <Card>
         <CardHeader>
           <CardTitle>Completed Interviews</CardTitle>
@@ -182,13 +199,13 @@ const IntervieweeDashboard = () => {
                   >
                     View Report
                   </Button>
-
                 </motion.div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
       <ReportModal
         open={reportOpen}
         onOpenChange={setReportOpen}

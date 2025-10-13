@@ -1,204 +1,248 @@
-import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { GoogleGenAI } from "@google/genai";
+
+type IncomingAnswer = {
+  questionId?: string; 
+  questionText: string;
+  difficulty?: string | null;
+  content: string;
+};
+
+type EvaluatedAnswer = IncomingAnswer & {
+  score: number | null;
+  feedback: string;
+};
 
 export async function POST(req: Request) {
   const supabase = await createClient();
 
   try {
-    const { candidateId, answers, roomId } = await req.json();
+    const body = await req.json();
+    const { candidateId, roomCode, answers } = body as {
+      candidateId?: string;
+      roomCode?: string;
+      answers?: IncomingAnswer[];
+    };
 
-    if (!candidateId)
+    if (!candidateId) {
       return NextResponse.json(
         { error: "Candidate ID is required" },
         { status: 400 }
       );
-    if (!Array.isArray(answers) || answers.length === 0)
-      return NextResponse.json(
-        { error: "Answers array is required" },
-        { status: 400 }
-      );
-      if (!roomId)
+    }
+    if (!roomCode) {
       return NextResponse.json(
         { error: "Room ID is required" },
         { status: 400 }
       );
-
-    const answersToInsert = answers.map((a: any, i: number) => ({
-      id: crypto.randomUUID(),
-      question_index: i,
-      candidate_id: candidateId,
-      content: a.content,
-      submitted_at: new Date().toISOString(),
-    }));
-
-    const { data: insertedAnswers, error: insertError } = await supabase
-      .from("answers")
-      .insert(answersToInsert)
-      .select();
-    // 0️⃣ Ensure candidate is in room_participants
-    const { data: existingParticipant, error: existingError } = await supabase
-      .from("room_participants")
-      .select("id")
-      .eq("room_code", roomId)
-      .eq("user_id", candidateId)
-      .single();
-
-    if (!existingParticipant) {
-      const { error: rpError } = await supabase
-        .from("room_participants")
-        .insert([
-          {
-            room_code: roomId,
-            user_id: candidateId,
-          },
-        ])
-        .select();
-
-      if (rpError) console.error("Error adding to room_participants:", rpError);
-      else console.log("Candidate added to room_participants");
     }
-
-    if (insertError) {
-      console.error("Failed to insert answers:", insertError);
+    if (!Array.isArray(answers) || answers.length === 0) {
       return NextResponse.json(
-        { error: "Failed to save answers" },
-        { status: 500 }
+        { error: "A non-empty array of answers is required" },
+        { status: 400 }
       );
     }
 
-   const prompt = `
-You are an expert AI technical interviewer. Evaluate the following answers on a scale of 0-100. Provide a score and concise, constructive feedback for EACH answer.
-Output ONLY a valid JSON array of objects, with no markdown, commentary, or extra text.
+    const normalizedAnswers: IncomingAnswer[] = answers.map((a) => ({
+      questionId: a.questionId,
+      questionText: (a.questionText ?? "").trim(),
+      difficulty: a.difficulty ?? null,
+      content: (a.content ?? "").trim(),
+    }));
 
-The JSON format MUST be:
+    const evaluationPrompt = `
+You are an expert AI technical interviewer. Evaluate the following interview answers on a scale of 0-100.
+For each answer, return a JSON object with numeric "score" and concise "feedback".
+
+Output ONLY a valid JSON array of objects and nothing else. Format must be:
 [
   {"index": 0, "score": 85, "feedback": "Clear and accurate explanation of the concept."},
-  {"index": 1, "score": 60, "feedback": "The answer is partially correct but misses key details about execution context."},
+  {"index": 1, "score": 60, "feedback": "Partially correct; misses edge cases."},
   ...
 ]
 
-Here are the questions and answers:
-${answers
+Questions and candidate answers:
+${normalizedAnswers
   .map(
-    (a: any, i: number) => `Question ${i + 1}: ${a.question}\nAnswer: ${a.content}`
+    (a, i) =>
+      `Question ${i + 1}${a.questionId ? ` (id:${a.questionId})` : ""}: ${
+        a.questionText
+      }\nAnswer: ${a.content}`
   )
   .join("\n\n---\n\n")}
-`;
+`.trim();
 
     const genAi = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-    const response = await genAi.models.generateContent({
+    const evalResponse = await genAi.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
-      config: { temperature: 0.3, maxOutputTokens: 2000 },
+      contents: evaluationPrompt,
+      config: { temperature: 0.2, maxOutputTokens: 3000 },
     });
 
-    const rawEvaluationText = response.text;
-    if (!rawEvaluationText) {
-      console.error("Raw AI response for evaluation was empty.");
+    const rawEvalText = evalResponse?.text;
+    if (!rawEvalText || typeof rawEvalText !== "string") {
+      console.error("Empty AI evaluation response.");
       return NextResponse.json(
-        { error: "Failed to get a valid evaluation from AI." },
+        { error: "Failed to get evaluation from AI." },
         { status: 500 }
       );
     }
-    let judged: { index: number; score: number; feedback: string }[] = [];
+
+    let evaluations: { index: number; score: number; feedback: string }[] = [];
     try {
-      // get json part
-      const cleanedJson = rawEvaluationText.match(/\[[\s\S]*\]/)?.[0];
-      if (!cleanedJson) throw new Error("No valid JSON array found in AI response.");
-      judged = JSON.parse(cleanedJson);
+      const jsonMatch = rawEvalText.match(/\[[\s\S]*\]/)?.[0];
+      if (!jsonMatch) {
+        throw new Error("No JSON array found in AI response");
+      }
+      const parsed = JSON.parse(jsonMatch);
+      if (!Array.isArray(parsed))
+        throw new Error("Parsed evaluation is not an array");
+      evaluations = parsed.map((p) => ({
+        index: Number(p.index),
+        score: Number.isFinite(p.score) ? Number(p.score) : 0,
+        feedback:
+          typeof p.feedback === "string"
+            ? p.feedback
+            : String(p.feedback ?? ""),
+      }));
     } catch (err) {
       console.error("Error parsing AI evaluation JSON:", err);
-      console.error("Raw AI response for evaluation:", rawEvaluationText);
+      console.error("Raw AI evaluation text:", rawEvalText);
       return NextResponse.json(
-        { error: "Failed to parse AI evaluation response." },
+        { error: "Failed to parse AI evaluation." },
         { status: 500 }
       );
     }
 
-    // update answers
-    for (const j of judged) {
-      const matchedAnswer = insertedAnswers.find(
-        (a) => a.question_index === j.index 
-      );
-      if (!matchedAnswer) continue;
+    const evaluatedAnswers: EvaluatedAnswer[] = normalizedAnswers.map(
+      (ans, idx) => {
+        const ev = evaluations.find((e) => e.index === idx);
+        return {
+          ...ans,
+          score: ev ? Math.max(0, Math.min(100, Math.round(ev.score))) : null,
+          feedback: ev
+            ? ev.feedback || "No feedback provided."
+            : "No evaluation available.",
+        };
+      }
+    );
 
-      const { error: updateError } = await supabase
-        .from("answers")
-        .update({
-          ai_score: Math.max(0, Math.min(100, j.score ?? 0)),
-          ai_feedback: j.feedback || "No feedback provided",
-        })
-        .eq("id", matchedAnswer.id);
-
-      if (updateError) console.error(`❌ Error updating answer for index ${j.index}:`, updateError);
-    }
-
-    const scores = judged.map((j) => j.score).filter((s) => typeof s === "number");
-    const avgScore = scores.length
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+    const numericScores = evaluatedAnswers
+      .map((a) => a.score)
+      .filter((s): s is number => typeof s === "number");
+    const averageScore = numericScores.length
+      ? Math.round(
+          numericScores.reduce((x, y) => x + y, 0) / numericScores.length
+        )
       : 0;
 
     const summaryPrompt = `
-You are an expert hiring manager providing a final summary of a candidate's interview performance.
-Based on the questions, their answers, and the individual feedback, write a concise, one-paragraph summary.
-Address their overall knowledge, clarity of communication, and potential strengths or weaknesses.
-Do NOT output JSON or any other format. Just the text of the summary itself.
+You are an expert hiring manager. Provide a concise, one-paragraph summary of the candidate's interview performance.
+Comment on overall knowledge, clarity, strengths and weaknesses. Output only the paragraph text (no JSON).
 
-Here is the full interview context:
-${judged
+Context:
+${evaluatedAnswers
   .map(
-    (j, i) =>
-      `Question ${i + 1}: ${answers[i].question}\nCandidate's Answer: ${
-        answers[i].content
-      }\nEvaluation: Score ${j.score}/100 - ${j.feedback}`
+    (a, i) =>
+      `Question ${i + 1}: ${a.questionText}\nCandidate Answer: ${
+        a.content
+      }\nEvaluation: Score ${a.score ?? "N/A"}/100 - ${a.feedback}`
   )
   .join("\n\n")}
-`;
-const summaryResult = await genAi.models.generateContent({
+`.trim();
+
+    const summaryResponse = await genAi.models.generateContent({
       model: "gemini-2.5-flash",
       contents: summaryPrompt,
-      config: {
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      },
+      config: { temperature: 0.2, maxOutputTokens: 450 },
     });
-    const summaryText = summaryResult.text;
-    
-    const { data: userData } = await supabase
-      .from("users")
-      .select("name")
-      .eq("id", candidateId)
-      .single();
 
-    const participantName = userData?.name || "Unknown";
+    const summaryText =
+      summaryResponse && summaryResponse.text
+        ? summaryResponse.text.trim()
+        : `AI evaluation completed. Average score: ${averageScore}/100.`;
 
-    const { error: summaryError } = await supabase
-      .from("interview_summaries")
-      .insert([
-        {
-          room_code: roomId,
-          candidate_id: candidateId,
-          final_score: avgScore,
-          participant_name: participantName,
-          summary: summaryText || `AI evaluation completed. Average score: ${avgScore}/100.`,
-        },
-      ]);
+    try {
+      const { data: existingParticipant } = await supabase
+        .from("room_participants")
+        .select("id")
+        .eq("room_code", roomCode)
+        .eq("user_id", candidateId)
+        .single();
 
-    if (summaryError) console.error("Summary insert error:", summaryError);
+      if (!existingParticipant) {
+        const { error: rpError } = await supabase
+          .from("room_participants")
+          .insert([
+            {
+              room_code: roomCode,
+              user_id: candidateId,
+            },
+          ]);
+        if (rpError)
+          console.error("Error adding to room_participants:", rpError);
+      }
+    } catch (e) {
+      console.error("room_participants check/insert failed:", e);
+    }
 
+    const insertPayload = {
+      room_code: roomCode,
+      candidate_id: candidateId,
+      answers: evaluatedAnswers, // stored as JSONB
+      overall_score: averageScore,
+      overall_feedback: summaryText,
+      created_at: new Date().toISOString(),
+    };
+
+    const { error: insertError } = await supabase
+      .from("interview_attempts")
+      .insert(insertPayload);
+    if (insertError) {
+      console.error("Failed to insert interview_attempts row:", insertError);
+      return NextResponse.json(
+        { error: "Failed to save interview attempt." },
+        { status: 500 }
+      );
+    }
+
+    try {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", candidateId)
+        .single();
+
+      const participantName = userData?.name || "Unknown";
+
+      const { error: summaryError } = await supabase
+        .from("interview_summaries")
+        .insert([
+          {
+            room_code: roomCode,
+            candidate_id: candidateId,
+            final_score: averageScore,
+            participant_name: participantName,
+            summary: summaryText,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+      if (summaryError)
+        console.error("Failed to insert interview_summary row:", summaryError);
+    } catch (e) {
+      console.error("Unexpected error saving interview_summary:", e);
+    }
     return NextResponse.json({
-      average: avgScore,
-      totalEvaluated: scores.length,
-      judged,
+      average: averageScore,
       summary: summaryText,
+      evaluations: evaluatedAnswers,
     });
-
   } catch (err: any) {
-    console.error("AI judge route error:", err);
+    console.error("AI judge route unexpected error:", err);
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: err?.message ?? "Internal server error" },
       { status: 500 }
     );
   }
