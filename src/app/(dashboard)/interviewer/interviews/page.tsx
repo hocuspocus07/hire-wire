@@ -15,12 +15,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Trash, Users, Share2, Copy } from "lucide-react"
+import { Trash, Users, Share2, Copy, Lock, Unlock } from "lucide-react"
 import { getSupabaseBrowser } from "@/utils/supabase/browser-client"
 import { ParticipantMetricsModal } from "./participants"
 import { toast } from "sonner"
 import Link from "next/link"
 import { ConfirmDeleteModal } from "@/components/confirm-delete-modal"
+import { Switch } from "@/components/ui/switch"
 interface Participant {
   id: string
   name: string
@@ -31,6 +32,7 @@ interface Participant {
 interface Interview {
   code: string
   title: string
+  public: boolean
   participants: Participant[]
 }
 
@@ -74,7 +76,7 @@ export default function InterviewsPage() {
 
         const { data: rooms, error: roomsError } = await supabase
           .from("rooms")
-          .select("code, title")
+          .select("code, title,public")
           .eq("created_by", user.id)
           .order("created_at", { ascending: false })
 
@@ -96,6 +98,7 @@ export default function InterviewsPage() {
         const interviewsData: Interview[] = rooms.map((room: any) => ({
           code: room.code,
           title: room.title,
+          public: room.public,
           participants: summaries
             .filter((s: any) => s.room_code === room.code)
             .map((s: any) => ({
@@ -164,6 +167,29 @@ export default function InterviewsPage() {
       toast.success("Interview link copied to clipboard!")
     }
   }
+  const handleToggleVisibility = async (code: string, newValue: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("rooms")
+        .update({ public: newValue })
+        .eq("code", code)
+
+      if (error) throw error
+
+      setInterviews((prev) =>
+        prev.map((i) =>
+          i.code === code ? { ...i, public: newValue } : i
+        )
+      )
+
+      toast.success(
+        newValue ? "Interview made public!" : "Interview made private!"
+      )
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to update visibility.")
+    }
+  }
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code)
@@ -203,9 +229,37 @@ export default function InterviewsPage() {
                 className="flex flex-col justify-between transition-all hover:shadow-lg hover:-translate-y-1"
               >
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold tracking-tight">
-                    {interview.title}
+                  <CardTitle className="text-lg font-semibold tracking-tight flex flex-col gap-2">
+                    <span>{interview.title}</span>
+                    <div className="flex items-center justify-between bg-muted/30 px-3 py-2 rounded-md">
+                      <div className="flex items-center gap-2">
+                        {interview.public ? (
+                          <>
+                            <Unlock className="w-4 h-4 text-green-500" />
+                            <p className="text-sm text-green-600 font-medium">Public</p>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-4 h-4 text-red-500" />
+                            <p className="text-sm text-red-600 font-medium">Private</p>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={interview.public}
+                          onCheckedChange={(checked) =>
+                            handleToggleVisibility(interview.code, checked)
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {interview.public ? "Make Private" : "Make Public"}
+                        </p>
+                      </div>
+                    </div>
                   </CardTitle>
+
                   <div className="flex items-center gap-2 pt-2">
                     <p className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded-md">
                       {interview.code}

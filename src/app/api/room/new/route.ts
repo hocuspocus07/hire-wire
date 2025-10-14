@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   const supabase = await createClient()
   const body = await req.json()
 
-  const { created_by, title, data } = body
+  const { created_by, title, data, public: isPublic = true } = body
 
   const { data: user, error: userError } = await supabase
     .from("users")
@@ -34,6 +34,7 @@ export async function POST(req: Request) {
       created_by,
       code,
       data,
+      public: isPublic
     })
     .select()
     .single()

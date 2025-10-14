@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useEffect } from "react"
 import { createBrowserClient } from "@supabase/ssr"
+import { Switch } from "@/components/ui/switch"
 
 export default function CreateInterviewPage() {
   const [title, setTitle] = useState("")
@@ -21,6 +22,7 @@ export default function CreateInterviewPage() {
   const [generating, setGenerating] = useState(false)
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
+  const [isPublic, setIsPublic] = useState(true)
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -88,6 +90,7 @@ export default function CreateInterviewPage() {
           title,
           created_by: user?.id,
           data: { description, questions },
+          public: isPublic,
         }),
       })
 
@@ -129,6 +132,19 @@ export default function CreateInterviewPage() {
               placeholder="Enter short description (optional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center justify-between border rounded-md p-3">
+            <div>
+              <Label htmlFor="public-toggle">Make Interview Public</Label>
+              <p className="text-sm text-muted-foreground">
+                Public rooms appear in the public interviews list.
+              </p>
+            </div>
+            <Switch
+              id="public-toggle"
+              checked={isPublic}
+              onCheckedChange={setIsPublic}
             />
           </div>
 
