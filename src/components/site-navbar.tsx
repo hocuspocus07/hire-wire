@@ -7,7 +7,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { motion } from "framer-motion"
-import { Menu, Bot, LogIn, User, LayoutDashboard, Users, ClipboardPenLine, FileText, LogOut } from "lucide-react"
+import { Menu, Bot, LogIn, User, LayoutDashboard, ClipboardPenLine, FileText, LogOut } from "lucide-react"
 import { ModeToggle } from "./mode-toggle"
 import {
   DropdownMenu,
@@ -56,7 +56,6 @@ export function SiteNavbar() {
     role === "candidate"
       ? [
           { href: "/candidate/dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { href: "/candidate/interviews", label: "My Interviews", icon: FileText },
           { href: "/public-interviews", label: "Public Interviews", icon: ClipboardPenLine },
         ]
       : role === "interviewer"

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProfileEditDialog } from "@/components/profile-edit-dialog"
+import JoinInterviewModal from "@/components/join-interview"
 
 interface InterviewSummary {
   id: string
@@ -29,7 +30,7 @@ const IntervieweeDashboard = () => {
   const [editOpen, setEditOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [selectedInterview, setSelectedInterview] = useState<InterviewSummary | null>(null)
-
+  const [isJoinOpen, setIsJoinOpen] = useState(false)
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +54,7 @@ const IntervieweeDashboard = () => {
         .select("id, candidate_id, room_code, overall_score, overall_feedback, created_at")
         .eq("candidate_id", loggedUser.id)
         .order("created_at", { ascending: false })
-        console.log(data);
+      console.log(data);
 
       if (error) {
         console.error("Error fetching interview attempts:", error)
@@ -139,9 +140,8 @@ const IntervieweeDashboard = () => {
               <Edit className="h-4 w-4" />
               Edit Profile
             </Button>
-            <Button asChild>
-              <Link href="/interviewee/interviews/new">Schedule Interview</Link>
-            </Button>
+            <Button onClick={() => setIsJoinOpen(true)}>Join Interview</Button>
+            <JoinInterviewModal open={isJoinOpen} setOpen={setIsJoinOpen} />
           </>
         }
       />
