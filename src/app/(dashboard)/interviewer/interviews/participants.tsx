@@ -12,6 +12,7 @@ import { BarChart3, User, MessageSquare, Clock, Award, ChevronLeft, Sparkles } f
 import { Skeleton } from "@/components/ui/skeleton"
 import { PiSealQuestionFill } from "react-icons/pi";
 import { FaRegUser } from "react-icons/fa";
+import Link from "next/link"
 
 interface Participant {
   id: string
@@ -215,13 +216,15 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                 <Card className="bg-muted/30">
                   <CardContent className="p-6 flex justify-between items-center">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-primary" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold">{selectedParticipant.name}</h2>
-                        <p className="text-sm text-muted-foreground">Candidate Report</p>
-                      </div>
+                      <Link href={`/users/${selectedParticipant.id}`} className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold">{selectedParticipant.name}</h2>
+                          <p className="text-sm text-muted-foreground">Candidate Report</p>
+                        </div>
+                      </Link>
                     </div>
                     {attempt?.overall_score && (
                       <div className="text-right">
@@ -269,20 +272,20 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                         <Card key={index} className="bg-transparent shadow-none border-border/40">
                           <CardContent className="p-4 space-y-4">
                             <div>
-                                <div className="flex items-center">
+                              <div className="flex items-center">
                                 <PiSealQuestionFill className="text-red-700 mr-2" />
-                              <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                                Question {index + 1}
-                              </h4>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                                  Question {index + 1}
+                                </h4>
                               </div>
                               <p className="font-semibold">{ans.questionText}</p>
                             </div>
                             <div>
-                                <div className="flex items-center">
+                              <div className="flex items-center">
                                 <FaRegUser className="text-blue-700 mr-2" />
-                              <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                                Candidate’s Answer
-                              </h4>
+                                <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                                  Candidate’s Answer
+                                </h4>
                               </div>
                               <p className="text-sm bg-muted/50 rounded-md p-3 leading-relaxed">
                                 {ans.content}
