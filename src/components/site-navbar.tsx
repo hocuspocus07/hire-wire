@@ -7,7 +7,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { motion } from "framer-motion"
-import { Menu, Bot, LogIn, User, LayoutDashboard, Users, ClipboardPenLine, FileText } from "lucide-react"
+import { Menu, Bot, LogIn, User, LayoutDashboard, Users, ClipboardPenLine, FileText, LogOut } from "lucide-react"
 import { ModeToggle } from "./mode-toggle"
 import {
   DropdownMenu,
@@ -134,7 +134,7 @@ export function SiteNavbar() {
                     </Link>
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600"><LogOut className="w-4 h-4" /> Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
