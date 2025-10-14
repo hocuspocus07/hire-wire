@@ -27,7 +27,7 @@ export function Features() {
           viewport={{ once: true }}
           className="flex items-center justify-between mb-12"
         >
-          <h2 className="text-3xl md:text-5xl font-bold">Why Crisp</h2>
+          <h2 className="text-3xl md:text-5xl font-bold">Why HireWire?</h2>
           <Badge variant="secondary" className="text-sm px-3 py-1">
             Frontend Preview
           </Badge>
