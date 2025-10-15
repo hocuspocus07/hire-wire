@@ -2,17 +2,17 @@
 
 import type React from "react"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { getSupabaseBrowser } from "@/utils/supabase/browser-client"
 import { Camera, Loader2 } from "lucide-react"
-
+import { Github, Linkedin, Twitter } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
+import { toast } from "sonner"
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -27,12 +27,18 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
-    name: user?.user_metadata?.name || "",
-    email: user?.email || "",
-    bio: user?.user_metadata?.bio || "",
-    company: user?.user_metadata?.company || "",
-    position: user?.user_metadata?.position || "",
-    skills: user?.user_metadata?.skills || "",
+    name: "",
+    email: "",
+    bio: "",
+    company: "",
+    position: "",
+    skills: "",
+    phone: "",
+    socials: {
+      github: "",
+      linkedin: "",
+      twitter: "",
+    },
   })
 
   const supabase = getSupabaseBrowser()
@@ -46,7 +52,34 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
       .join("")
       .toUpperCase()
       .slice(0, 2)
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!open || !user?.id) return
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .single()
 
+      if (error) {
+        console.error("[v0] fetch user error:", error)
+        return
+      }
+
+      setFormData({
+        name: data.name || "",
+        email: data.email || "",
+        bio: data.bio || "",
+        company: data.company || "",
+        position: data.position || "",
+        phone: data.phone || "",
+        skills: Array.isArray(data.skills) ? data.skills.join(", ") : data.skills || "",
+        socials: data.socials || { github: "", linkedin: "", twitter: "" },
+      })
+
+    }
+    fetchUserData()
+  }, [open, user?.id])
   const getImageUrl = () => {
     const avatarUrl = user?.user_metadata?.avatar_url
     if (!avatarUrl) return null
@@ -113,6 +146,7 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
           avatar_path: filePath,
         },
       })
+      toast.success("Profile image uploaded successfully")
     } catch (err: any) {
       console.error("[v0] upload avatar error:", err)
       alert(`Error uploading image: ${err.message || "Unknown error"}`)
@@ -125,18 +159,17 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
     e.preventDefault()
     setLoading(true)
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { error } = await supabase.from("users").update({
         email: formData.email,
-        data: {
-          name: formData.name,
-          bio: formData.bio,
-          company: formData.company,
-          position: formData.position,
-          skills: formData.skills,
-          avatar_url: user?.user_metadata?.avatar_url,
-          avatar_path: user?.user_metadata?.avatar_path,
-        },
-      })
+        name: formData.name,
+        bio: formData.bio,
+        company: formData.company,
+        position: formData.position,
+        skills: formData.skills ? formData.skills.split(",").map((s: string) => s.trim()) : null,
+        phone: formData.phone,
+        socials: formData.socials,
+      }).eq("id", user.id)
+
       if (error) throw error
 
       onProfileUpdate({
@@ -149,9 +182,12 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
           company: formData.company,
           position: formData.position,
           skills: formData.skills,
+          phone: formData.phone,
+          socials: formData.socials,
         },
       })
       onOpenChange(false)
+      toast.success("Profile updated successfully")
     } catch (err: any) {
       console.error("[v0] update profile error:", err)
       alert(`Error updating profile: ${err.message || "Unknown error"}`)
@@ -231,6 +267,14 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
                 placeholder="Tell us about yourself..."
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
             {type === "interviewer" && (
               <>
                 <div className="space-y-2">
@@ -263,6 +307,51 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
                 <p className="text-xs text-muted-foreground">Separate skills with commas</p>
               </div>
             )}
+            {/* Socials */}
+            <div className="space-y-2">
+              <Label>Social Links</Label>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center gap-2">
+                  <Github className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="GitHub URL"
+                    value={formData.socials.github}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        socials: { ...formData.socials, github: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Linkedin className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="LinkedIn URL"
+                    value={formData.socials.linkedin}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        socials: { ...formData.socials, linkedin: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Twitter className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Twitter URL"
+                    value={formData.socials.twitter}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        socials: { ...formData.socials, twitter: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Actions */}

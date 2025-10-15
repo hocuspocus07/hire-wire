@@ -114,20 +114,26 @@ export default function PublicInterviewsPage() {
                         {interview.participants?.length !== 1 ? "s" : ""}
                       </span>
                     </div>
+                    <div className="flex items-center gap-2 pt-2">
+                    <p className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded-md">
+                      {interview.code}
+                    </p>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           size="icon"
                           variant="ghost"
+                          className="h-7 w-7"
                           onClick={() => handleCopyCode(interview.code)}
                         >
-                          <Copy className="w-4 h-4" />
+                          <Copy className="h-3.5 w-3.5" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Copy Code</p>
                       </TooltipContent>
                     </Tooltip>
+                  </div>
                   </div>
                 </CardHeader>
 

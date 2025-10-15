@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createBrowserClient } from "@supabase/ssr"
 import { motion } from "framer-motion"
-import { Star, Award, Timer, Edit } from "lucide-react"
+import { Star, Award, Timer, Edit, Briefcase, Building2, User, Phone, Github, Linkedin, Twitter } from "lucide-react"
 import { ReportModal } from "@/components/report-modal"
 import { ProfileHeader } from "@/components/profile-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProfileEditDialog } from "@/components/profile-edit-dialog"
 import JoinInterviewModal from "@/components/join-interview"
+import { Badge } from "@/components/ui/badge"
 
 interface InterviewSummary {
   id: string
@@ -25,12 +26,14 @@ interface InterviewSummary {
 
 const IntervieweeDashboard = () => {
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState<InterviewSummary[]>([])
   const [editOpen, setEditOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [selectedInterview, setSelectedInterview] = useState<InterviewSummary | null>(null)
   const [isJoinOpen, setIsJoinOpen] = useState(false)
+
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,7 +42,6 @@ const IntervieweeDashboard = () => {
 
     const fetchData = async () => {
       setLoading(true)
-
       const { data: userData } = await supabase.auth.getUser()
       const loggedUser = userData?.user
       setUser(loggedUser)
@@ -49,23 +51,27 @@ const IntervieweeDashboard = () => {
         return
       }
 
+      // Fetch profile data
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", loggedUser.id)
+        .single()
+      setProfile(userProfile)
+
+      // Fetch interviews
       const { data, error } = await supabase
         .from("interview_attempts")
         .select("id, candidate_id, room_code, overall_score, overall_feedback, created_at")
         .eq("candidate_id", loggedUser.id)
         .order("created_at", { ascending: false })
-      console.log(data);
 
-      if (error) {
-        console.error("Error fetching interview attempts:", error)
-        setLoading(false)
-        return
-      }
+      if (error) console.error("Error fetching interviews:", error)
 
       const mappedSummaries: InterviewSummary[] = (data || []).map((d: any) => ({
         id: d.id,
         candidate_id: d.candidate_id,
-        participant_name: loggedUser.user_metadata?.name ?? "Interview",
+        participant_name: userProfile?.name ?? loggedUser.email ?? "Interview",
         room_code: d.room_code,
         final_score: d.overall_score,
         created_at: d.created_at,
@@ -80,12 +86,11 @@ const IntervieweeDashboard = () => {
   }, [])
 
   const completed = summaries.filter((i) => i.final_score !== null)
-  console.log(completed);
   const avg =
     completed.length > 0
       ? Math.round(
-        completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) / completed.length
-      )
+          completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) / completed.length
+        )
       : null
   const best =
     completed.length > 0
@@ -123,11 +128,12 @@ const IntervieweeDashboard = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      <div className="flex">
       <ProfileHeader
-        name={user.user_metadata?.name || user.email?.split("@")[0] || "User"}
+        name={profile?.name || user.email?.split("@")[0] || "User"}
         role="Candidate"
-        email={user.email}
-        imageUrl={user.user_metadata?.avatar_url}
+        email={profile?.email || user.email}
+        imageUrl={profile?.avatar_url}
         meta={[
           { label: "Total Interviews", value: String(summaries.length) },
           { label: "Average Score", value: avg ? `${avg}%` : "-" },
@@ -136,7 +142,11 @@ const IntervieweeDashboard = () => {
         ]}
         actions={
           <>
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(true)}
+              className="flex items-center gap-2"
+            >
               <Edit className="h-4 w-4" />
               Edit Profile
             </Button>
@@ -146,6 +156,88 @@ const IntervieweeDashboard = () => {
         }
       />
 
+      {/* Profile Details */}
+      <Card className="w-full ml-2">
+        <CardHeader>
+          <CardTitle>Profile Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {profile?.bio && (
+            <div className="flex items-start gap-2">
+              <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <p>{profile.bio}</p>
+            </div>
+          )}
+          {profile?.company && (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <p>{profile.company}</p>
+            </div>
+          )}
+          {profile?.position && (
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-muted-foreground" />
+              <p>{profile.position}</p>
+            </div>
+          )}
+          {profile?.phone && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <p>{profile.phone}</p>
+            </div>
+          )}
+          {profile?.skills && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-muted-foreground">Skills:</span>
+              {Array.isArray(profile.skills)
+                ? profile.skills.map((s: string) => (
+                    <Badge key={s} variant="secondary">
+                      {s}
+                    </Badge>
+                  ))
+                : profile.skills.split(",").map((s: string) => (
+                    <Badge key={s.trim()} variant="secondary">
+                      {s.trim()}
+                    </Badge>
+                  ))}
+            </div>
+          )}
+
+          {profile?.socials && (
+            <div className="flex items-center gap-4 flex-wrap pt-2">
+              {profile.socials.github && (
+                <Link
+                  href={profile.socials.github}
+                  target="_blank"
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Github className="h-4 w-4" /> GitHub
+                </Link>
+              )}
+              {profile.socials.linkedin && (
+                <Link
+                  href={profile.socials.linkedin}
+                  target="_blank"
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Linkedin className="h-4 w-4" /> LinkedIn
+                </Link>
+              )}
+              {profile.socials.twitter && (
+                <Link
+                  href={profile.socials.twitter}
+                  target="_blank"
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                >
+                  <Twitter className="h-4 w-4" /> Twitter
+                </Link>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+</div>
+      {/* Completed Interviews */}
       <Card>
         <CardHeader>
           <CardTitle>Completed Interviews</CardTitle>
@@ -216,8 +308,8 @@ const IntervieweeDashboard = () => {
       <ProfileEditDialog
         open={editOpen}
         onOpenChange={setEditOpen}
-        user={user}
-        onProfileUpdate={setUser}
+        user={{ ...user, ...profile }}
+        onProfileUpdate={setProfile}
         type="candidate"
       />
     </div>
