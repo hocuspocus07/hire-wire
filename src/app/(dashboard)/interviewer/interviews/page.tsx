@@ -76,7 +76,7 @@ export default function InterviewsPage() {
 
         const { data: rooms, error: roomsError } = await supabase
           .from("rooms")
-          .select("code, title,public")
+          .select("code, title,public,participants")
           .eq("created_by", user.id)
           .order("created_at", { ascending: false })
 
@@ -99,13 +99,7 @@ export default function InterviewsPage() {
           code: room.code,
           title: room.title,
           public: room.public,
-          participants: summaries
-            .filter((s: any) => s.room_code === room.code)
-            .map((s: any) => ({
-              id: s.participant_name,
-              name: s.participant_name,
-              score: s.final_score,
-            })),
+          participants: room.participants
         }))
 
         setInterviews(interviewsData)

@@ -10,15 +10,9 @@ import { Separator } from "@/components/ui/separator"
 import { createBrowserClient } from "@supabase/ssr"
 import { BarChart3, User, MessageSquare, Clock, Award, ChevronLeft, Sparkles } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { PiSealQuestionFill } from "react-icons/pi";
-import { FaRegUser } from "react-icons/fa";
+import { PiSealQuestionFill } from "react-icons/pi"
+import { FaRegUser } from "react-icons/fa"
 import Link from "next/link"
-
-interface Participant {
-  id: string
-  name: string
-  score: number | null
-}
 
 interface Answer {
   questionId: number
@@ -32,6 +26,7 @@ interface Answer {
 interface InterviewAttempt {
   id: string
   candidate_id: string
+  candidate_name: string 
   room_code: string
   answers: Answer[]
   overall_summary: string
@@ -46,11 +41,9 @@ interface Props {
 }
 
 export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
-  const [participants, setParticipants] = useState<Participant[]>([])
-  const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null)
-  const [attempt, setAttempt] = useState<InterviewAttempt | null>(null)
+  const [attempts, setAttempts] = useState<InterviewAttempt[]>([])
+  const [selectedAttempt, setSelectedAttempt] = useState<InterviewAttempt | null>(null)
   const [loading, setLoading] = useState(false)
-  const [loadingParticipants, setLoadingParticipants] = useState(false)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,87 +56,63 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
     score >= 80 ? "default" : score >= 60 ? "secondary" : "destructive"
 
   useEffect(() => {
-    const fetchParticipants = async () => {
-      setLoadingParticipants(true)
+    const fetchAllAttempts = async () => {
+      if (!roomCode) return
+      setLoading(true)
       try {
         const { data, error } = await supabase
           .from("interview_attempts")
-          .select("candidate_id, overall_score, users(name)")
+          .select("*, users(name)") 
           .eq("room_code", roomCode)
           .order("created_at", { ascending: false })
 
         if (error) throw error
 
-        const unique = new Map()
-        data?.forEach((row: any) => {
-          if (!unique.has(row.candidate_id)) {
-            unique.set(row.candidate_id, {
-              id: row.candidate_id,
-              name: row.users?.name || "Unknown",
-              score: row.overall_score,
-            })
-          }
-        })
+        const formattedAttempts = data.map((row: any) => ({
+          ...row,
+          candidate_name: row.users?.name || "Unknown",
+        }))
 
-        setParticipants(Array.from(unique.values()))
+        setAttempts(formattedAttempts)
       } catch (err) {
-        console.error("Error fetching participants:", err)
+        console.error("Error fetching attempts:", err)
       } finally {
-        setLoadingParticipants(false)
+        setLoading(false)
       }
     }
 
-    if (roomCode) fetchParticipants()
-  }, [roomCode])
-
-  useEffect(() => {
-    if (selectedParticipant) fetchParticipantAttempt(selectedParticipant.id)
-  }, [selectedParticipant])
-
-  const fetchParticipantAttempt = async (participantId: string) => {
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from("interview_attempts")
-        .select("*")
-        .eq("candidate_id", participantId)
-        .eq("room_code", roomCode)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
-
-      if (error) throw error
-      setAttempt(data as InterviewAttempt)
-    } catch (err) {
-      console.error("Error fetching interview attempt:", err)
-    } finally {
-      setLoading(false)
+    if (open) {
+      fetchAllAttempts()
+    } else {
+      handleBack()
     }
+  }, [roomCode, open])
+
+  const handleAttemptClick = (attempt: InterviewAttempt) => {
+    setSelectedAttempt(attempt)
   }
 
-  const handleParticipantClick = (p: Participant) => setSelectedParticipant(p)
   const handleBack = () => {
-    setSelectedParticipant(null)
-    setAttempt(null)
+    setSelectedAttempt(null)
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-scroll flex flex-col p-0">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col p-0">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-3 text-lg font-semibold">
             <BarChart3 className="w-5 h-5 text-primary" />
-            {selectedParticipant
-              ? `${selectedParticipant.name}'s Interview Report`
-              : "Interview Participants"}
+            {selectedAttempt
+              ? `${selectedAttempt.candidate_name}'s Interview Report`
+              : "All Interview Attempts"}
           </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="flex-grow">
           <div className="p-6">
-            {!selectedParticipant ? (
+            {!selectedAttempt ? (
               <div className="space-y-3">
-                {loadingParticipants ? (
+                {loading ? (
                   <>
                     {[...Array(3)].map((_, i) => (
                       <Card key={i} className="border-border/60">
@@ -160,20 +129,20 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                       </Card>
                     ))}
                   </>
-                ) : participants.length === 0 ? (
+                ) : attempts.length === 0 ? (
                   <Card className="bg-muted/40 border-dashed border-2">
                     <CardContent className="p-8 text-center text-muted-foreground">
                       <User className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p className="font-medium">No participants found</p>
+                      <p className="font-medium">No attempts found</p>
                       <p className="text-sm">No one has attempted this interview yet.</p>
                     </CardContent>
                   </Card>
                 ) : (
-                  participants.map((p) => (
+                  attempts.map((att) => (
                     <Card
-                      key={p.id}
+                      key={att.id} 
                       className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/50 hover:bg-muted/50"
-                      onClick={() => handleParticipantClick(p)}
+                      onClick={() => handleAttemptClick(att)}
                     >
                       <CardContent className="p-4 flex justify-between items-center">
                         <div className="flex items-center gap-4">
@@ -181,16 +150,19 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                             <User className="w-5 h-5 text-primary" />
                           </div>
                           <div>
-                            <h3 className="font-semibold">{p.name}</h3>
-                            <p className="text-sm text-muted-foreground">Candidate</p>
+                            <h3 className="font-semibold">{att.candidate_name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Attempted on:{" "}
+                              {new Date(att.created_at).toLocaleString()}
+                            </p>
                           </div>
                         </div>
-                        {p.score !== null ? (
+                        {att.overall_score !== null ? (
                           <Badge
-                            variant={getScoreVariant(p.score)}
+                            variant={getScoreVariant(att.overall_score)}
                             className="px-3 py-1 text-sm font-semibold"
                           >
-                            {p.score}/100
+                            {att.overall_score}/100
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-muted-foreground">
@@ -210,26 +182,26 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                   className="text-sm text-muted-foreground hover:text-primary"
                 >
                   <ChevronLeft className="w-4 h-4 mr-1" />
-                  Back to Participants
+                  Back to All Attempts
                 </Button>
 
                 <Card className="bg-muted/30">
                   <CardContent className="p-6 flex justify-between items-center">
                     <div className="flex items-center gap-4">
-                      <Link href={`/users/${selectedParticipant.id}`} className="flex items-center gap-4">
+                      <Link href={`/users/${selectedAttempt.candidate_id}`} className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
                           <User className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                          <h2 className="text-xl font-bold">{selectedParticipant.name}</h2>
+                          <h2 className="text-xl font-bold">{selectedAttempt.candidate_name}</h2>
                           <p className="text-sm text-muted-foreground">Candidate Report</p>
                         </div>
                       </Link>
                     </div>
-                    {attempt?.overall_score && (
+                    {selectedAttempt?.overall_score && (
                       <div className="text-right">
-                        <div className={`text-4xl font-bold ${getScoreColor(attempt.overall_score)}`}>
-                          {attempt.overall_score}
+                        <div className={`text-4xl font-bold ${getScoreColor(selectedAttempt.overall_score)}`}>
+                          {selectedAttempt.overall_score}
                         </div>
                         <div className="text-sm text-muted-foreground">Overall Score</div>
                       </div>
@@ -244,82 +216,64 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {loading ? (
-                      <>
-                        {[...Array(2)].map((_, i) => (
-                          <Card key={i} className="p-4 bg-muted/40 space-y-4">
-                            <div className="space-y-2">
-                              <Skeleton className="h-4 w-1/4" />
-                              <Skeleton className="h-5 w-3/4" />
-                            </div>
-                            <div className="space-y-2">
-                              <Skeleton className="h-4 w-1/4" />
-                              <Skeleton className="h-12 w-full" />
-                            </div>
-                            <div className="space-y-2">
-                              <Skeleton className="h-4 w-1/4" />
-                              <Skeleton className="h-16 w-full" />
-                            </div>
-                          </Card>
-                        ))}
-                      </>
-                    ) : !attempt?.answers?.length ? (
+                    {!selectedAttempt?.answers?.length ? (
                       <div className="text-center py-8 text-muted-foreground">
                         No answers were submitted for evaluation.
                       </div>
                     ) : (
-                      attempt.answers.map((ans, index) => (
+                      selectedAttempt.answers.map((ans, index) => (
                         <Card key={index} className="bg-transparent shadow-none border-border/40">
-                          <CardContent className="p-4 space-y-4">
-                            <div>
-                              <div className="flex items-center">
-                                <PiSealQuestionFill className="text-red-700 mr-2" />
-                                <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                                  Question {index + 1}
-                                </h4>
-                              </div>
-                              <p className="font-semibold">{ans.questionText}</p>
-                            </div>
-                            <div>
-                              <div className="flex items-center">
-                                <FaRegUser className="text-blue-700 mr-2" />
-                                <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                                  Candidate’s Answer
-                                </h4>
-                              </div>
-                              <p className="text-sm bg-muted/50 rounded-md p-3 leading-relaxed">
-                                {ans.content}
-                              </p>
-                            </div>
-                            {ans.score !== null && (
-                              <div className="space-y-3 pt-2">
-                                <Separator />
-                                <div className="flex items-center justify-between">
-                                  <h4 className="font-semibold text-sm flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-teal-500" />
-                                    AI Evaluation
-                                  </h4>
-                                  <Badge variant={getScoreVariant(ans.score)}>
-                                    Score: {ans.score}/100
-                                  </Badge>
-                                </div>
-                                {ans.feedback && (
-                                  <div className="bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-500/30 rounded-lg p-3">
-                                    <p className="text-sm text-teal-900 dark:text-teal-100 leading-relaxed">
-                                      {ans.feedback}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </CardContent>
+                          {/* Answer content here */}
+                           <CardContent className="p-4 space-y-4">
+                             <div>
+                               <div className="flex items-center">
+                                 <PiSealQuestionFill className="text-red-700 mr-2" />
+                                 <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                                   Question {index + 1}
+                                 </h4>
+                               </div>
+                               <p className="font-semibold">{ans.questionText}</p>
+                             </div>
+                             <div>
+                               <div className="flex items-center">
+                                 <FaRegUser className="text-blue-700 mr-2" />
+                                 <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                                   Candidate’s Answer
+                                 </h4>
+                               </div>
+                               <p className="text-sm bg-muted/50 rounded-md p-3 leading-relaxed">
+                                 {ans.content}
+                               </p>
+                             </div>
+                             {ans.score !== null && (
+                               <div className="space-y-3 pt-2">
+                                 <Separator />
+                                 <div className="flex items-center justify-between">
+                                   <h4 className="font-semibold text-sm flex items-center gap-2">
+                                     <Sparkles className="w-4 h-4 text-teal-500" />
+                                     AI Evaluation
+                                   </h4>
+                                   <Badge variant={getScoreVariant(ans.score)}>
+                                     Score: {ans.score}/100
+                                   </Badge>
+                                 </div>
+                                 {ans.feedback && (
+                                   <div className="bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-500/30 rounded-lg p-3">
+                                     <p className="text-sm text-teal-900 dark:text-teal-100 leading-relaxed">
+                                       {ans.feedback}
+                                     </p>
+                                   </div>
+                                 )}
+                               </div>
+                             )}
+                           </CardContent>
                         </Card>
                       ))
                     )}
                   </CardContent>
                 </Card>
 
-                {attempt?.overall_summary && (
+                {selectedAttempt?.overall_summary && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -331,12 +285,12 @@ export function ParticipantMetricsModal({ open, setOpen, roomCode }: Props) {
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {attempt.overall_summary}
+                        {selectedAttempt.overall_summary}
                       </p>
                       <div className="flex items-center gap-2 mt-4 pt-4 border-t text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         Completed on{" "}
-                        {new Date(attempt.created_at).toLocaleDateString("en-US", {
+                        {new Date(selectedAttempt.created_at).toLocaleDateString("en-US", {
                           year: "numeric",
                           month: "long",
                           day: "numeric",
