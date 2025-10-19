@@ -133,7 +133,7 @@ export default function InterviewerDashboard() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
         <h1 className="text-2xl font-bold">Access Denied</h1>
         <p className="text-muted-foreground">Please log in to access your dashboard.</p>
-        <Button asChild><Link href="/auth/login">Log In</Link></Button>
+        <Button asChild><Link href="/login">Log In</Link></Button>
       </div>
     )
   }
