@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { createBrowserClient } from "@supabase/ssr"
-
+import Link from "next/link"
 interface JoinInterviewModalProps {
     open: boolean
     setOpen: (open: boolean) => void
@@ -63,6 +63,7 @@ export default function JoinInterviewModal({ open, setOpen }: JoinInterviewModal
                         className="tracking-widest text-center font-mono text-lg"
                         maxLength={6}
                     />
+                    <Link href="/public-interviews" className="flex items-center justify-center text-sm text-gray-300 hover:text-foreground">or join a public interview</Link>
 
                     <Button
                         onClick={handleJoin}

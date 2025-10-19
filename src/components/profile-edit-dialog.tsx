@@ -62,7 +62,6 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
         .single()
 
       if (error) {
-        console.error("[v0] fetch user error:", error)
         return
       }
 
@@ -91,7 +90,7 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
       try {
         await supabase.storage.from("avatars").remove([user.user_metadata.avatar_path])
       } catch (e) {
-        console.error("[v0] delete old avatar error:", e)
+        console.error("delete old avatar error:", e)
       }
     }
   }
@@ -100,11 +99,11 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
     const file = e.target.files?.[0]
     if (!file || !user) return
     if (!file.type.startsWith("image/")) {
-      alert("Please upload a valid image")
+      toast.error("Please upload a valid image")
       return
     }
     if (file.size > 2 * 1024 * 1024) {
-      alert("Max 2MB image size")
+      toast.error("Max 2MB image size")
       return
     }
 
@@ -148,8 +147,8 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
       })
       toast.success("Profile image uploaded successfully")
     } catch (err: any) {
-      console.error("[v0] upload avatar error:", err)
-      alert(`Error uploading image: ${err.message || "Unknown error"}`)
+      console.error("upload avatar error:", err)
+      toast.error(`Error uploading image: ${err.message || "Unknown error"}`)
     } finally {
       setUploading(false)
     }
@@ -189,8 +188,8 @@ export function ProfileEditDialog({ open, onOpenChange, user, onProfileUpdate, t
       onOpenChange(false)
       toast.success("Profile updated successfully")
     } catch (err: any) {
-      console.error("[v0] update profile error:", err)
-      alert(`Error updating profile: ${err.message || "Unknown error"}`)
+      console.error("update profile error:", err)
+      toast.error(`Error updating profile: ${err.message || "Unknown error"}`)
     } finally {
       setLoading(false)
     }

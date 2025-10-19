@@ -108,9 +108,9 @@ const IntervieweeDashboard = () => {
   const avg =
     completed.length > 0
       ? Math.round(
-          completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) /
-            completed.length
-        )
+        completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) /
+        completed.length
+      )
       : null
   const best =
     completed.length > 0
@@ -221,15 +221,15 @@ const IntervieweeDashboard = () => {
                   <div className="flex flex-wrap gap-2">
                     {Array.isArray(profile.skills)
                       ? profile.skills.map((s: string) => (
-                          <Badge key={s} variant="secondary">
-                            {s}
-                          </Badge>
-                        ))
+                        <Badge key={s} variant="secondary">
+                          {s}
+                        </Badge>
+                      ))
                       : profile.skills.split(",").map((s: string) => (
-                          <Badge key={s.trim()} variant="secondary">
-                            {s.trim()}
-                          </Badge>
-                        ))}
+                        <Badge key={s.trim()} variant="secondary">
+                          {s.trim()}
+                        </Badge>
+                      ))}
                   </div>
                 </div>
               )}
@@ -277,10 +277,13 @@ const IntervieweeDashboard = () => {
             </CardHeader>
             <CardContent>
               {completed.length === 0 ? (
-                <div className="text-center py-10">
+                <div className="text-center py-10 space-y-4">
                   <p className="text-muted-foreground">
                     No completed interviews yet.
                   </p>
+                  <Button asChild>
+                    <Link href="/public-interviews">Join a public interview</Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">

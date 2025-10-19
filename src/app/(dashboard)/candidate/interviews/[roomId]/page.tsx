@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { motion, AnimatePresence } from "framer-motion"
 import { CheckCircle2, ClipboardList, Loader2 } from "lucide-react"
-
+import { toast } from "sonner"
 interface Question {
   id: string
   questionText: string
@@ -193,7 +193,7 @@ export default function InterviewRoom() {
 
     } catch (error) {
       console.error("Error submitting answers:", error)
-      alert("There was an error submitting your answers. Please try again.")
+      toast.error("There was an error submitting your answers. Please try again.")
       setSubmitting(false)
     }
   }

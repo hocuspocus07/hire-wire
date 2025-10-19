@@ -1,10 +1,28 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
-import { Users, CalendarDays, Copy, LogIn } from "lucide-react"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip"
+import {
+  Users,
+  CalendarDays,
+  Copy,
+  LogIn,
+  Share2,
+  Unlock,
+} from "lucide-react"
 import { toast } from "sonner"
 import { getSupabaseBrowser } from "@/utils/supabase/browser-client"
 
@@ -16,18 +34,18 @@ interface PublicInterview {
 }
 
 const InterviewCardSkeleton = () => (
-  <Card className="flex flex-col justify-between animate-pulse">
+  <Card className="flex flex-col justify-between">
     <CardHeader>
-      <div className="h-6 w-3/4 bg-muted rounded-md"></div>
-      <div className="h-5 w-1/2 bg-muted rounded-md mt-2"></div>
+      <div className="h-6 w-3/4 bg-muted rounded-md animate-pulse"></div>
+      <div className="h-5 w-1/2 bg-muted rounded-md animate-pulse mt-2"></div>
     </CardHeader>
     <CardContent>
-      <div className="h-5 w-1/3 bg-muted rounded-md"></div>
+      <div className="h-5 w-1/3 bg-muted rounded-md animate-pulse"></div>
     </CardContent>
     <CardFooter className="bg-muted/30 p-3 flex justify-between items-center">
-      <div className="h-10 flex-1 mr-2 bg-muted rounded-md"></div>
+      <div className="h-10 flex-1 mr-2 bg-muted rounded-md animate-pulse"></div>
       <div className="flex gap-2">
-        <div className="h-10 w-10 bg-muted rounded-md"></div>
+        <div className="h-10 w-10 bg-muted rounded-md animate-pulse"></div>
       </div>
     </CardFooter>
   </Card>
@@ -70,6 +88,12 @@ export default function PublicInterviewsPage() {
     window.location.href = `/candidate/interviews/${code}`
   }
 
+  const handleShareLink = (code: string, title: string) => {
+    const shareUrl = `${window.location.origin}/candidate/interviews/${code}`
+    navigator.clipboard.writeText(shareUrl)
+    toast.success("Interview link copied to clipboard!")
+  }
+
   return (
     <TooltipProvider>
       <div className="container mx-auto p-4 md:p-8 space-y-8">
@@ -103,18 +127,18 @@ export default function PublicInterviewsPage() {
                 className="flex flex-col justify-between transition-all hover:shadow-lg hover:-translate-y-1"
               >
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold tracking-tight">
-                    {interview.title}
-                  </CardTitle>
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Users className="w-4 h-4 mr-2" />
-                      <span>
-                        {interview.participants?.length || 0} Participant
-                        {interview.participants?.length !== 1 ? "s" : ""}
-                      </span>
+                  <CardTitle className="text-lg font-semibold tracking-tight flex flex-col gap-2">
+                    <span>{interview.title}</span>
+                    <div className="flex items-center justify-between bg-muted/30 px-3 py-2 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <Unlock className="w-4 h-4 text-green-500" />
+                        <p className="text-sm text-green-600 font-medium">
+                          Public
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 pt-2">
+                  </CardTitle>
+                  <div className="flex items-center gap-2 pt-2">
                     <p className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded-md">
                       {interview.code}
                     </p>
@@ -134,19 +158,49 @@ export default function PublicInterviewsPage() {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  </div>
                 </CardHeader>
 
-                <CardContent className="text-sm text-muted-foreground flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4" />
-                  {new Date(interview.created_at).toLocaleDateString()}
+                <CardContent className="space-y-2">
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Users className="w-4 h-4 mr-2" />
+                    <span>
+                      {interview.participants?.length || 0} Participant
+                      {interview.participants?.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <CalendarDays className="w-4 h-4 mr-2" />
+                    <span>
+                      Created on{" "}
+                      {new Date(interview.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </CardContent>
 
-                <CardFooter className="bg-muted/30 p-3 flex justify-end">
-                  <Button onClick={() => handleJoinInterview(interview.code)} className="flex items-center gap-2">
-                    <LogIn className="w-4 h-4" />
-                    Join
+                <CardFooter className="bg-muted/30 p-3 flex justify-between items-center">
+                  <Button
+                    className="flex-1 mr-2"
+                    onClick={() => handleJoinInterview(interview.code)}
+                  >
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Join Interview
                   </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() =>
+                          handleShareLink(interview.code, interview.title)
+                        }
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Copy Invite Link</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </CardFooter>
               </Card>
             ))}
