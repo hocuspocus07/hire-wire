@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { motion, AnimatePresence } from "framer-motion"
+import { CheckCircle2, ClipboardList, Loader2 } from "lucide-react"
 
 interface Question {
   id: string
@@ -22,29 +23,13 @@ interface Participant {
 }
 
 interface InterviewRoomData {
-  id: string 
+  id: string
   title: string
   created_by: string
   ownerName?: string
   questions: Question[]
   participants: Participant[]
   code: string
-}
-
-interface RoomDataFromDB {
-  id: string;
-  title: string;
-  created_by: string;
-  data?: {
-    description?: string;
-    questions?: Array<{
-      id: string;
-      question: string;
-      difficulty: string;
-      correctAnswer?: string;
-    }>;
-    participants?: Participant[];
-  };
 }
 
 interface AnswerData {
@@ -56,7 +41,8 @@ interface AnswerData {
 
 export default function InterviewRoom() {
   const params = useParams()
-  const roomCode = params.roomId as string;
+  const router = useRouter()
+  const roomCode = params.roomId as string
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
@@ -66,16 +52,28 @@ export default function InterviewRoom() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answer, setAnswer] = useState("")
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(false)
+  const [isReviewing, setIsReviewing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [userAnswers, setUserAnswers] = useState<AnswerData[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null)
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       setCurrentUser(user)
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", user.id)
+          .single()
+        setCurrentUserProfile(profile)
+      }
     }
     fetchUser()
   }, [supabase])
@@ -85,10 +83,10 @@ export default function InterviewRoom() {
       setLoading(true)
       const { data, error } = await supabase
         .from("rooms")
-        .select(`id, title, created_by, data`)
+        .select(`id, title, created_by, data, participants`)
         .eq("code", roomCode)
         .single()
-console.log(data);
+
       if (error) {
         console.error("Error fetching room:", error)
         setLoading(false)
@@ -96,33 +94,24 @@ console.log(data);
       }
 
       if (data) {
-        const roomDataFromDB = data as RoomDataFromDB
-        const ownerId = roomDataFromDB.created_by
-        
         const { data: ownerData } = await supabase
           .from("users")
           .select("name")
-          .eq("id", ownerId)
+          .eq("id", data.created_by)
           .single()
 
-        const ownerName = ownerData?.name || "Unknown"
-        
-        const questions: Question[] = (roomDataFromDB.data?.questions || []).map((q, index) => ({
-          id: q.id ?? index.toString(),
-          questionText: q.question,
-          difficulty: q.difficulty,
-        }));
-
-        const participants: Participant[] = roomDataFromDB.data?.participants || []
-
         setRoomData({
-          id: roomDataFromDB.id,
-          title: roomDataFromDB.title,
-          created_by: ownerId,
-          questions,
-          participants,
-          ownerName,
-          code: roomCode
+          id: data.id,
+          title: data.title,
+          created_by: data.created_by,
+          questions: (data.data?.questions || []).map((q: any, i: number) => ({
+            id: q.id ?? i.toString(),
+            questionText: q.question,
+            difficulty: q.difficulty,
+          })),
+          participants: data.participants || [],
+          ownerName: ownerData?.name || "Unknown",
+          code: roomCode,
         })
       }
       setLoading(false)
@@ -138,10 +127,10 @@ console.log(data);
   const handleNextQuestion = () => {
     if (!roomData?.questions) return
     if (currentQuestionIndex < roomData.questions.length - 1) {
-      setCurrentQuestionIndex(prevIndex => prevIndex + 1)
+      setCurrentQuestionIndex((prevIndex) => prevIndex + 1)
       setAnswer("")
     } else {
-      setIsCompleted(true)
+      setIsReviewing(true)
     }
   }
 
@@ -152,28 +141,28 @@ console.log(data);
       questionId: currentQuestion.id,
       questionText: currentQuestion.questionText,
       difficulty: currentQuestion.difficulty,
-      content: answer.trim()
+      content: answer.trim(),
     }
 
-    setUserAnswers(prev => [...prev, newAnswer])
+    setUserAnswers((prev) => [...prev, newAnswer])
     handleNextQuestion()
   }
 
   const handleSubmitAllAnswers = async () => {
-    if (!currentUser || userAnswers.length === 0 || !roomData) {
-      console.error("User not logged in, no answers to submit, or room data missing.")
+    if (!currentUser || !currentUserProfile || userAnswers.length === 0 || !roomData) {
+      console.error("User, profile, answers, or room data is missing.")
       return
     }
 
     setSubmitting(true)
     try {
-      const response = await fetch('/api/ai/judge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/ai/judge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           candidateId: currentUser.id,
           roomCode: roomData.code,
-          answers: userAnswers, 
+          answers: userAnswers,
         }),
       })
 
@@ -182,91 +171,169 @@ console.log(data);
       }
 
       const result = await response.json()
-      console.log('AI Evaluation Result:', result)
-      alert(`Interview completed! Your average score is: ${result.averageScore}/100\nDetailed feedback is available in your dashboard.`)
+
+      const newParticipant = {
+        id: currentUser.id,
+        name: currentUserProfile.name || currentUser.email,
+      }
+      const isAlreadyParticipant = (roomData.participants || []).some(
+        (p: Participant) => p.id === currentUser.id
+      )
+      if (!isAlreadyParticipant) {
+        const updatedParticipants = [...(roomData.participants || []), newParticipant]
+        await supabase
+          .from("rooms")
+          .update({ participants: updatedParticipants })
+          .eq("id", roomData.id)
+      }
+
+      const score = result.average
+      const feedback = encodeURIComponent(result.summary)
+      router.push(`/candidate/interviews/${roomCode}/results?score=${score}&feedback=${feedback}`)
 
     } catch (error) {
-      console.error('Error submitting answers:', error)
-      alert('There was an error submitting your answers. Please try again.')
-    } finally {
+      console.error("Error submitting answers:", error)
+      alert("There was an error submitting your answers. Please try again.")
       setSubmitting(false)
     }
   }
 
-  if (loading) return <div className="container mx-auto p-6 text-center">Loading Room...</div>
-  if (!roomData) return <div className="container mx-auto p-6 text-center">Room not found.</div>
+  if (loading) {
+    return (
+      <div className="container mx-auto flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!roomData) {
+    return <div className="container mx-auto p-6 text-center">Room not found.</div>
+  }
 
   if (!isInterviewStarted) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>{roomData.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center">
-              <Badge variant="outline">Room #{roomCode}</Badge>
-              <div className="text-sm text-muted-foreground text-right">
-                <p>Owner: {roomData.ownerName}</p>
-                <p>Total Questions: {roomData.questions?.length || 0}</p>
-              </div>
-            </div>
-            <Button className="w-full" onClick={handleStartInterview}>
-              Start Interview
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="container mx-auto p-6 max-w-2xl flex items-center min-h-[calc(100vh-8rem)]">
+         <Card className="w-full shadow-lg">
+           <CardHeader className="items-center text-center">
+             <ClipboardList className="h-12 w-12 text-primary" />
+             <CardTitle className="text-2xl pt-2">{roomData.title}</CardTitle>
+             <p className="text-sm text-muted-foreground">
+               Created by {roomData.ownerName}
+             </p>
+           </CardHeader>
+           <CardContent className="space-y-4 text-center">
+             <div className="text-muted-foreground text-sm space-y-1">
+               <p>You are about to start an interview.</p>
+               <p>
+                 There are{" "}
+                 <span className="font-bold text-primary">
+                   {roomData.questions?.length || 0}
+                 </span>{" "}
+                 questions to answer.
+               </p>
+               <p>Good luck!</p>
+             </div>
+             <Button
+               className="w-full"
+               size="lg"
+               onClick={handleStartInterview}
+             >
+               Start Interview
+             </Button>
+           </CardContent>
+         </Card>
+       </div>
     )
   }
 
-  if (isCompleted) {
+  if (isReviewing) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>Interview Completed</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <h3 className="font-semibold mb-2">Your Answers ({userAnswers.length}/{roomData.questions.length}):</h3>
-              <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
-                {userAnswers.map((ans, index) => (
-                  <div key={index} className="border rounded p-3">
-                    <p className="font-medium">Q: {ans.questionText}</p>
-                    <p className="text-sm text-muted-foreground mt-1">A: {ans.content}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button onClick={handleSubmitAllAnswers} disabled={submitting} className="flex-1">
-                {submitting ? "Submitting..." : "Submit for AI Evaluation"}
-              </Button>
-              <Button variant="outline" onClick={() => { setIsCompleted(false); setCurrentQuestionIndex(0); }} disabled={submitting}>
-                Review Answers
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+       <div className="container mx-auto p-6 max-w-3xl">
+         <Card className="w-full">
+           <CardHeader className="text-center">
+             <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
+             <CardTitle className="text-2xl pt-2">
+               Ready to Submit?
+             </CardTitle>
+             <p className="text-muted-foreground">
+               You've answered all the questions. Review your answers below
+               before submitting for AI evaluation.
+             </p>
+           </CardHeader>
+           <CardContent className="space-y-6">
+             <div>
+               <h3 className="font-semibold mb-2">
+                 Your Answers ({userAnswers.length}/{roomData.questions.length}):
+               </h3>
+               <div className="max-h-60 overflow-y-auto space-y-2 p-2 bg-muted/50 rounded-md">
+                 {userAnswers.map((ans, index) => (
+                   <div key={index} className="border bg-background rounded p-3 text-sm">
+                     <p className="font-semibold text-primary">
+                       Q: {ans.questionText}
+                     </p>
+                     <p className="text-muted-foreground mt-1">A: {ans.content}</p>
+                   </div>
+                 ))}
+               </div>
+             </div>
+             <div className="flex flex-col sm:flex-row gap-4">
+               <Button
+                 onClick={handleSubmitAllAnswers}
+                 disabled={submitting}
+                 className="flex-1"
+                 size="lg"
+               >
+                 {submitting ? (
+                   <>
+                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                     Submitting...
+                   </>
+                 ) : (
+                   "Submit for AI Evaluation"
+                 )}
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() => setIsReviewing(false)}
+                 disabled={submitting}
+               >
+                 Go Back & Edit
+               </Button>
+             </div>
+           </CardContent>
+         </Card>
+       </div>
     )
   }
-  
+
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl md:text-2xl font-semibold">{roomData.title}</h1>
-        <Badge variant="secondary">Question {currentQuestionIndex + 1} of {roomData.questions.length}</Badge>
+    <div className="container mx-auto p-4 md:p-6 max-w-4xl space-y-8">
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-xl font-semibold text-muted-foreground">
+            {roomData.title}
+          </h1>
+          <Badge variant="secondary">
+            Question {currentQuestionIndex + 1} of {roomData.questions.length}
+          </Badge>
+        </div>
+        <Progress
+          value={
+            ((currentQuestionIndex + 1) / roomData.questions.length) * 100
+          }
+          className="h-3"
+        />
       </div>
 
-      <Progress value={((currentQuestionIndex + 1) / roomData.questions.length) * 100} />
-
-      {currentQuestion ? (
+      {currentQuestion && (
         <Card>
-          <CardHeader className="pb-2 flex flex-row justify-between items-start">
-            <CardTitle>Question {currentQuestionIndex + 1}</CardTitle>
-            <Badge variant="outline" className="capitalize">{currentQuestion.difficulty}</Badge>
+          <CardHeader className="pb-4 flex flex-row justify-between items-start">
+            <CardTitle className="text-lg">
+              Question {currentQuestionIndex + 1}
+            </CardTitle>
+            <Badge variant="outline" className="capitalize">
+              {currentQuestion.difficulty}
+            </Badge>
           </CardHeader>
           <CardContent>
             <AnimatePresence mode="wait">
@@ -275,35 +342,35 @@ console.log(data);
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="text-lg font-medium"
+                transition={{ duration: 0.25 }}
+                className="text-xl md:text-2xl font-medium leading-relaxed"
               >
                 {currentQuestion.questionText}
               </motion.p>
             </AnimatePresence>
           </CardContent>
         </Card>
-      ) : (
-        <div className="text-center p-6 text-muted-foreground">Loading question...</div>
       )}
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle>Your Answer</CardTitle>
+          <CardTitle className="text-lg">Your Answer</CardTitle>
         </CardHeader>
         <CardContent>
           <textarea
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type your answer here..."
-            className="w-full h-48 rounded-md border bg-background p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring transition-shadow"
+            placeholder="Type your detailed answer here..."
+            className="w-full min-h-[200px] rounded-md border bg-transparent p-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring transition-shadow resize-none"
           />
           <div className="mt-4 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
               {answer.trim().length} characters
             </span>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={handleNextQuestion}>Skip</Button>
+              <Button variant="ghost" onClick={handleNextQuestion}>
+                Skip
+              </Button>
               <Button onClick={handleSubmitAnswer} disabled={!answer.trim()}>
                 Submit & Next
               </Button>

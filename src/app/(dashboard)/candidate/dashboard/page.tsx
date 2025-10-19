@@ -4,7 +4,19 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createBrowserClient } from "@supabase/ssr"
 import { motion } from "framer-motion"
-import { Star, Award, Timer, Edit, Briefcase, Building2, User, Phone, Github, Linkedin, Twitter } from "lucide-react"
+import {
+  Star,
+  Award,
+  Timer,
+  Edit,
+  Briefcase,
+  Building2,
+  User,
+  Phone,
+  Github,
+  Linkedin,
+  Twitter,
+} from "lucide-react"
 import { ReportModal } from "@/components/report-modal"
 import { ProfileHeader } from "@/components/profile-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,7 +43,8 @@ const IntervieweeDashboard = () => {
   const [summaries, setSummaries] = useState<InterviewSummary[]>([])
   const [editOpen, setEditOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
-  const [selectedInterview, setSelectedInterview] = useState<InterviewSummary | null>(null)
+  const [selectedInterview, setSelectedInterview] =
+    useState<InterviewSummary | null>(null)
   const [isJoinOpen, setIsJoinOpen] = useState(false)
 
   useEffect(() => {
@@ -42,8 +55,9 @@ const IntervieweeDashboard = () => {
 
     const fetchData = async () => {
       setLoading(true)
-      const { data: userData } = await supabase.auth.getUser()
-      const loggedUser = userData?.user
+      const {
+        data: { user: loggedUser },
+      } = await supabase.auth.getUser()
       setUser(loggedUser)
 
       if (!loggedUser) {
@@ -62,21 +76,26 @@ const IntervieweeDashboard = () => {
       // Fetch interviews
       const { data, error } = await supabase
         .from("interview_attempts")
-        .select("id, candidate_id, room_code, overall_score, overall_feedback, created_at")
+        .select(
+          "id, candidate_id, room_code, overall_score, overall_feedback, created_at"
+        )
         .eq("candidate_id", loggedUser.id)
         .order("created_at", { ascending: false })
 
       if (error) console.error("Error fetching interviews:", error)
 
-      const mappedSummaries: InterviewSummary[] = (data || []).map((d: any) => ({
-        id: d.id,
-        candidate_id: d.candidate_id,
-        participant_name: userProfile?.name ?? loggedUser.email ?? "Interview",
-        room_code: d.room_code,
-        final_score: d.overall_score,
-        created_at: d.created_at,
-        summary: d.overall_feedback,
-      }))
+      const mappedSummaries: InterviewSummary[] = (data || []).map(
+        (d: any) => ({
+          id: d.id,
+          candidate_id: d.candidate_id,
+          participant_name:
+            userProfile?.name ?? loggedUser.email ?? "Interview",
+          room_code: d.room_code,
+          final_score: d.overall_score,
+          created_at: d.created_at,
+          summary: d.overall_feedback,
+        })
+      )
 
       setSummaries(mappedSummaries)
       setLoading(false)
@@ -89,7 +108,8 @@ const IntervieweeDashboard = () => {
   const avg =
     completed.length > 0
       ? Math.round(
-          completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) / completed.length
+          completed.reduce((acc, curr) => acc + (curr.final_score ?? 0), 0) /
+            completed.length
         )
       : null
   const best =
@@ -106,29 +126,35 @@ const IntervieweeDashboard = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-24 w-full rounded-lg" />
-        <Skeleton className="h-24 w-full rounded-lg" />
-        <Skeleton className="h-24 w-full rounded-lg" />
+      <div className="container mx-auto p-4 md:p-6 space-y-6">
+        <Skeleton className="h-40 w-full rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-64 w-full rounded-lg lg:col-span-1" />
+          <Skeleton className="h-96 w-full rounded-lg lg:col-span-2" />
+        </div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="text-center space-y-4">
-        <h2 className="text-xl font-semibold">Welcome</h2>
-        <p className="text-muted-foreground">Please sign in to view your dashboard.</p>
-        <Button asChild>
-          <Link href="/auth/login">Log In</Link>
-        </Button>
+      <div className="flex h-[60vh] items-center justify-center text-center">
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold">Welcome</h2>
+          <p className="text-muted-foreground">
+            Please sign in to view your dashboard.
+          </p>
+          <Button asChild>
+            <Link href="/auth/login">Log In</Link>
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex">
+    <div className="container mx-auto p-4 md:p-6 space-y-8">
+      {/* --- Main Profile Header --- */}
       <ProfileHeader
         name={profile?.name || user.email?.split("@")[0] || "User"}
         role="Candidate"
@@ -156,147 +182,165 @@ const IntervieweeDashboard = () => {
         }
       />
 
-      {/* Profile Details */}
-      <Card className="w-full ml-2">
-        <CardHeader>
-          <CardTitle>Profile Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {profile?.bio && (
-            <div className="flex items-start gap-2">
-              <User className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <p>{profile.bio}</p>
-            </div>
-          )}
-          {profile?.company && (
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <p>{profile.company}</p>
-            </div>
-          )}
-          {profile?.position && (
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-              <p>{profile.position}</p>
-            </div>
-          )}
-          {profile?.phone && (
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <p>{profile.phone}</p>
-            </div>
-          )}
-          {profile?.skills && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-muted-foreground">Skills:</span>
-              {Array.isArray(profile.skills)
-                ? profile.skills.map((s: string) => (
-                    <Badge key={s} variant="secondary">
-                      {s}
-                    </Badge>
-                  ))
-                : profile.skills.split(",").map((s: string) => (
-                    <Badge key={s.trim()} variant="secondary">
-                      {s.trim()}
-                    </Badge>
-                  ))}
-            </div>
-          )}
-
-          {profile?.socials && (
-            <div className="flex items-center gap-4 flex-wrap pt-2">
-              {profile.socials.github && (
-                <Link
-                  href={profile.socials.github}
-                  target="_blank"
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-                >
-                  <Github className="h-4 w-4" /> GitHub
-                </Link>
+      {/* --- Main Content Grid --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* --- Left Column: Profile Details --- */}
+        <div className="lg:col-span-1 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {profile?.bio && (
+                <div className="flex items-start gap-3">
+                  <User className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-muted-foreground">{profile.bio}</p>
+                </div>
               )}
-              {profile.socials.linkedin && (
-                <Link
-                  href={profile.socials.linkedin}
-                  target="_blank"
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-                >
-                  <Linkedin className="h-4 w-4" /> LinkedIn
-                </Link>
+              {profile?.company && (
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <p>{profile.company}</p>
+                </div>
               )}
-              {profile.socials.twitter && (
-                <Link
-                  href={profile.socials.twitter}
-                  target="_blank"
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-                >
-                  <Twitter className="h-4 w-4" /> Twitter
-                </Link>
+              {profile?.position && (
+                <div className="flex items-center gap-3">
+                  <Briefcase className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <p>{profile.position}</p>
+                </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-</div>
-      {/* Completed Interviews */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Completed Interviews</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {completed.length === 0 ? (
-            <p className="text-muted-foreground">No completed interviews yet</p>
-          ) : (
-            <div className="space-y-3">
-              {completed.map((i) => (
-                <motion.div
-                  key={i.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <div className="font-medium">{i.participant_name ?? "Interview"}</div>
-                      <span className="rounded-md px-2 py-0.5 text-xs border">Completed</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                      <div className="flex items-center gap-1">
-                        <Star className="size-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Score</span>
-                        <span className="font-medium ml-1">{i.final_score ?? 0}%</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Award className="size-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Percentile</span>
-                        <span className="font-medium ml-1">
-                          Top {calcPercentile(i.final_score ?? 0)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Timer className="size-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Date</span>
-                        <span className="ml-1">
-                          {new Date(i.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
+              {profile?.phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <p>{profile.phone}</p>
+                </div>
+              )}
+              {profile?.skills && (
+                <div className="flex items-start gap-3 flex-wrap">
+                  <span className="font-medium text-primary mt-1">Skills:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.isArray(profile.skills)
+                      ? profile.skills.map((s: string) => (
+                          <Badge key={s} variant="secondary">
+                            {s}
+                          </Badge>
+                        ))
+                      : profile.skills.split(",").map((s: string) => (
+                          <Badge key={s.trim()} variant="secondary">
+                            {s.trim()}
+                          </Badge>
+                        ))}
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedInterview(i)
-                      setReportOpen(true)
-                    }}
-                  >
-                    View Report
-                  </Button>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              )}
+
+              {profile?.socials && (
+                <div className="flex items-center gap-4 flex-wrap pt-4 border-t mt-4">
+                  {profile.socials.github && (
+                    <Link
+                      href={profile.socials.github}
+                      target="_blank"
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Github className="h-4 w-4" /> GitHub
+                    </Link>
+                  )}
+                  {profile.socials.linkedin && (
+                    <Link
+                      href={profile.socials.linkedin}
+                      target="_blank"
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Linkedin className="h-4 w-4" /> LinkedIn
+                    </Link>
+                  )}
+                  {profile.socials.twitter && (
+                    <Link
+                      href={profile.socials.twitter}
+                      target="_blank"
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Twitter className="h-4 w-4" /> Twitter
+                    </Link>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* --- Right Column: Completed Interviews --- */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Completed Interviews</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {completed.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">
+                    No completed interviews yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {completed.map((i) => (
+                    <motion.div
+                      key={i.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border bg-card hover:bg-muted/50 transition-colors p-4 space-y-3 sm:space-y-0"
+                    >
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <div className="font-semibold text-base">
+                            {i.participant_name ?? "Interview"}
+                          </div>
+                          <Badge variant="outline">Completed</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <Star className="size-4" />
+                            <span>Score:</span>
+                            <span className="font-medium text-primary ml-1">
+                              {i.final_score ?? 0}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Award className="size-4" />
+                            <span>Percentile:</span>
+                            <span className="font-medium text-primary ml-1">
+                              Top {100 - calcPercentile(i.final_score ?? 0)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Timer className="size-4" />
+                            <span>Date:</span>
+                            <span className="font-medium text-primary ml-1">
+                              {new Date(i.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedInterview(i)
+                          setReportOpen(true)
+                        }}
+                      >
+                        View Report
+                      </Button>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <ReportModal
         open={reportOpen}
