@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, LogIn, Mail, Lock, ArrowRight, Bot } from "lucide-react"
+import { Eye, EyeOff, LogIn, Mail, Lock, ArrowRight} from "lucide-react"
 import { signIn } from "@/utils/actions"
 import {toast} from 'sonner'
 import { useRouter } from "next/navigation"
@@ -74,21 +74,6 @@ export default function LoginPage() {
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex justify-center mb-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center h-12 w-12 bg-gradient-to-br from-primary to-primary/70 rounded-xl">
-                <Bot className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-2xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                HireWire
-              </span>
-            </div>
-          </motion.div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
           <p className="text-muted-foreground mt-2">
             Sign in to your account to continue

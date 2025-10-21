@@ -7,7 +7,7 @@ import { createBrowserClient } from "@supabase/ssr"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { motion } from "framer-motion"
-import { Menu, Bot, LogIn, User, LayoutDashboard, ClipboardPenLine, FileText, LogOut } from "lucide-react"
+import { Menu, LogIn, User, LayoutDashboard, ClipboardPenLine, FileText, LogOut } from "lucide-react"
 import { ModeToggle } from "./mode-toggle"
 import {
   DropdownMenu,
@@ -55,16 +55,16 @@ export function SiteNavbar() {
   const roleNav =
     role === "candidate"
       ? [
-          { href: "/candidate/dashboard", label: "Dashboard", icon: LayoutDashboard },
-          { href: "/public-interviews", label: "Public Interviews", icon: ClipboardPenLine },
-        ]
+        { href: "/candidate/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/public-interviews", label: "Public Interviews", icon: ClipboardPenLine },
+      ]
       : role === "interviewer"
-      ? [
+        ? [
           { href: "/interviewer/dashboard", label: "Dashboard", icon: LayoutDashboard },
           { href: "/interviewer/interviews", label: "My Interviews", icon: FileText },
           { href: "/public-interviews", label: "Public Interviews", icon: ClipboardPenLine },
         ]
-      : []
+        : []
 
   const publicNav = [
     { href: "#features", label: "Features" },
@@ -82,9 +82,7 @@ export function SiteNavbar() {
       <nav className="w-full flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-            <Bot className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src="/favicon.png" alt="Hirewire logo" className="h-8 w-8" />
           <span className="font-bold text-lg">HireWire</span>
         </Link>
 
@@ -166,9 +164,7 @@ export function SiteNavbar() {
                 {/* Header */}
                 <div className="p-5 flex items-center justify-between border-b border-border/40">
                   <Link href="/" className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary-foreground" />
-                    </div>
+                    <img src="/favicon.png" alt="Hirewire logo" className="h-8 w-8" />
                     <span className="font-bold text-lg">HireWire</span>
                   </Link>
                 </div>
