@@ -3,33 +3,42 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
+import { getSupabaseBrowser } from "@/utils/supabase/browser-client"
 
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [status, setStatus] = useState("Finishing sign-in...")
 
   useEffect(() => {
-    const handleAuth = async () => {
+    const finishAuth = async () => {
       try {
-        const code = new URLSearchParams(window.location.search).get("code")
-        if (!code) throw new Error("No code found in URL")
+        const supabase = await getSupabaseBrowser()
+        const { data, error } = await supabase.auth.getSession()
 
-        const res = await fetch(`/auth/callback?code=${code}`)
-        if (res.redirected) {
-          window.location.href = res.url
+        if (error) {
+          console.error("Session fetch error:", error)
+          setStatus("Could not complete sign-in. Redirecting to error page...")
+          setTimeout(() => router.push("/auth/auth-code-error"), 1500)
           return
         }
 
-        setStatus("Could not complete sign-in. Redirecting to error page...")
-        router.push("/auth/auth-code-error")
+        if (!data.session) {
+          setStatus("No active session found. Redirecting to login...")
+          setTimeout(() => router.push("/login"), 1500)
+          return
+        }
+
+        // Success
+        setStatus("Sign-in successful! Redirecting...")
+        setTimeout(() => router.push("/login"), 1000)
       } catch (err) {
-        console.error(err)
+        console.error("Unexpected error:", err)
         setStatus("Something went wrong. Redirecting...")
         setTimeout(() => router.push("/auth/auth-code-error"), 1500)
       }
     }
 
-    handleAuth()
+    finishAuth()
   }, [router])
 
   return (

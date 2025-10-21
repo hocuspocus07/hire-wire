@@ -11,6 +11,7 @@ import { Eye, EyeOff, LogIn, Mail, Lock, ArrowRight, Bot } from "lucide-react"
 import { signIn } from "@/utils/actions"
 import {toast} from 'sonner'
 import { useRouter } from "next/navigation"
+import { ForgotPasswordModal } from "@/components/forgot-password"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -130,12 +131,7 @@ export default function LoginPage() {
                   <Label htmlFor="password" className="text-sm font-medium">
                     Password
                   </Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
+                  <ForgotPasswordModal />
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
